@@ -6,11 +6,13 @@
 // the visitor gives is stored, put in the address bar or sent anywhere
 // but the log address they typed.
 import CHECKS from "../content/checks.json" with { type: "json" };
-import { checkReceipts, show, type CheckResult, type Inputs, type ReceiptReport } from "./checks.ts";
+import { Ed25519Unavailable } from "./bytes.ts";
+import { checkReceipts, show, type CheckId, type CheckResult, type Inputs, type ReceiptReport } from "./checks.ts";
 import { hasEd25519 } from "./ed25519-support.ts";
 import { MAX_INPUT_CHARS, parseReceipts } from "./input.ts";
 import { KeyError, parsePublicKeys, type PublicKey } from "./keys.ts";
 import { LogClient, parseLogAddress } from "./log-client.ts";
+import { UNSAFE_TEXT } from "./tree-head.ts";
 
 interface Problem {
   field: string;
@@ -18,6 +20,23 @@ interface Problem {
 }
 
 const STATUS_LABEL: Record<CheckResult["status"], string> = { passed: "Passed", failed: "Failed", "not-run": "Not run" };
+
+/** Checks 1 to 4: whether the receipt itself is valid. */
+const RECEIPT_CHECKS: readonly CheckId[] = ["format", "signature", "content-hash", "repeated-fields"];
+/** Checks 5 to 7: what the log says. */
+const LOG_CHECKS: readonly CheckId[] = ["tree-head", "in-log", "witnesses"];
+/** The log checks that must run for the log to count as checked; witnesses are optional. */
+const LOG_REQUIRED: readonly CheckId[] = ["tree-head", "in-log"];
+
+/** The id prefix of problem links, which a field's aria-describedby names. */
+const PROBLEM_ID = "problem-";
+
+const UNSAFE_ALL = new RegExp(UNSAFE_TEXT.source, "gu");
+
+/** A check's detail without control or bidirectional characters: it can quote the log's own error text. */
+function detailOf(c: CheckResult): string {
+  return c.detail.replace(UNSAFE_ALL, "");
+}
 
 function byId(doc: Document, id: string): HTMLElement {
   const found = doc.getElementById(id);
@@ -42,25 +61,27 @@ async function readKeys(text: string, field: string, source: string, problems: P
   try {
     return await parsePublicKeys(text, source);
   } catch (e) {
-    problems.push({ field, message: e instanceof KeyError ? e.message : `${source} could not be read.` });
+    problems.push({ field, message: e instanceof KeyError || e instanceof Ed25519Unavailable ? e.message : `${source} could not be read.` });
     return [];
   }
 }
 
-/** Reads the form into inputs for the checks, or the problems to show. */
+/** Reads the form into inputs for the checks, or the problems to show. Every field is read before the first await. */
 async function readForm(doc: Document): Promise<{ receipts: unknown[]; inputs: Inputs } | { problems: Problem[] }> {
   const problems: Problem[] = [];
   const value = (id: string): string => textField(doc, id).value;
-  const parsed = parseReceipts(value("receipt-text"));
+  const receiptText = value("receipt-text");
+  const issuerText = value("issuer-key");
+  const address = value("log-address").trim();
+  const logKeyText = value("log-key");
+  const witnessText = value("witness-keys");
+  const parsed = parseReceipts(receiptText);
   if (!parsed.ok) problems.push({ field: "receipt-text", message: parsed.reason });
-  const issuerKeys = await readKeys(value("issuer-key"), "issuer-key", "The issuer key", problems);
+  const issuerKeys = await readKeys(issuerText, "issuer-key", "The issuer key", problems);
   if (issuerKeys.length === 0 && !problems.some((p) => p.field === "issuer-key")) {
     problems.push({ field: "issuer-key", message: "Paste the issuer's public key (a PEM block), or choose its file." });
   }
   let log: Inputs["log"];
-  const address = value("log-address").trim();
-  const logKeyText = value("log-key");
-  const witnessText = value("witness-keys");
   if (address !== "") {
     const parsedAddress = parseLogAddress(address);
     const logKeys = await readKeys(logKeyText, "log-key", "The log key", problems);
@@ -75,20 +96,64 @@ async function readForm(doc: Document): Promise<{ receipts: unknown[]; inputs: I
   return { receipts: parsed.receipts, inputs: { issuerKeys, log } };
 }
 
+/** Takes away the marks a previous run left on the fields: aria-invalid, and the problem ids in aria-describedby. */
+function clearFieldMarks(doc: Document): void {
+  for (const f of doc.querySelectorAll("[aria-invalid]")) f.removeAttribute("aria-invalid");
+  for (const f of doc.querySelectorAll("[aria-describedby]")) {
+    const kept = (f.getAttribute("aria-describedby") ?? "").split(/\s+/).filter((t) => t !== "" && !t.startsWith(PROBLEM_ID));
+    if (kept.length > 0) f.setAttribute("aria-describedby", kept.join(" "));
+    else f.removeAttribute("aria-describedby");
+  }
+}
+
+/** Opens the <details> a field is in, if any, and moves focus to the field. */
+function goToField(field: HTMLElement): void {
+  const details = field.closest("details");
+  if (details !== null) details.open = true;
+  field.focus();
+}
+
 function renderProblems(doc: Document, problems: Problem[]): void {
   const box = byId(doc, "problems");
   box.replaceChildren(el(doc, "h2", undefined, problems.length === 1 ? "There is a problem" : `There are ${String(problems.length)} problems`));
   const list = el(doc, "ul");
-  for (const p of problems) {
+  problems.forEach((p, i) => {
     const field = byId(doc, p.field);
+    const id = `${PROBLEM_ID}${String(i + 1)}`;
     field.setAttribute("aria-invalid", "true");
+    field.setAttribute("aria-describedby", `${field.getAttribute("aria-describedby") ?? ""} ${id}`.trim());
     const a = el(doc, "a", undefined, p.message);
+    a.id = id;
     a.href = `#${p.field}`;
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      goToField(field);
+    });
     const li = el(doc, "li");
     li.append(a);
     list.append(li);
-  }
+  });
   box.append(list);
+  box.hidden = false;
+  box.focus();
+}
+
+/** An error the checks did not expect: no results, and the problem box says so and takes focus, so the page is never left on Checking. */
+function renderFailure(doc: Document): void {
+  const message = "The checks stopped on an error this page did not expect. Nothing was sent; reload the page and try again.";
+  for (const id of ["results", "retry"]) {
+    const e = doc.getElementById(id);
+    if (e !== null) e.hidden = true;
+  }
+  doc.getElementById("results-list")?.replaceChildren();
+  const status = doc.getElementById("status");
+  const box = doc.getElementById("problems");
+  if (box === null) {
+    if (status !== null) status.textContent = message;
+    return;
+  }
+  if (status !== null) status.textContent = "";
+  box.replaceChildren(el(doc, "h2", undefined, "The checks stopped"), el(doc, "p", undefined, message));
   box.hidden = false;
   box.focus();
 }
@@ -101,26 +166,45 @@ function renderCheck(doc: Document, c: CheckResult): HTMLLIElement {
   const name = el(doc, "a", "check-name", info?.name ?? c.id);
   name.href = `terms/${info?.term ?? ""}/`;
   head.append(name);
-  li.append(head, el(doc, "p", "check-detail", c.detail));
+  li.append(head, el(doc, "p", "check-detail", detailOf(c)));
   if (info !== undefined) {
     li.append(el(doc, "p", "check-proves", `What it proves: ${info.proves}`), el(doc, "p", "check-limits", `What it does not prove: ${info.doesNotProve}`));
   }
   return li;
 }
 
-/** The first of checks 5 to 7 that failed, for a receipt that is valid on its own: said beside the verdict, never hidden by it. */
-function failedLogCheck(report: ReceiptReport): CheckResult | undefined {
-  return report.valid ? report.checks.slice(4).find((c) => c.status === "failed") : undefined;
+/**
+ * What to say beside the verdict of a receipt that is valid on its own, so
+ * the verdict never hides the log: the first of checks 5 to 7 that failed,
+ * or, when a log was given, the tree head or the proof not run.
+ */
+function logNote(report: ReceiptReport, logGiven: boolean): string {
+  if (!report.valid) return "";
+  const failed = report.checks.find((c) => LOG_CHECKS.includes(c.id) && c.status === "failed");
+  if (failed !== undefined) return ` But the log check failed: ${detailOf(failed)}`;
+  if (!logGiven) return "";
+  const notRun = report.checks.find((c) => LOG_REQUIRED.includes(c.id) && c.status === "not-run");
+  if (notRun === undefined) return "";
+  const why = detailOf(notRun);
+  return ` But the log was not checked: ${why.startsWith("Not run: ") ? why.slice("Not run: ".length) : why}`;
 }
 
-function renderReport(doc: Document, report: ReceiptReport, index: number, total: number): HTMLElement {
+/** Why asking the log again may help: it was not reached or was busy, or its answer could not be read. */
+function retryCause(c: CheckResult): "reach" | "unreadable" | undefined {
+  if (!c.retry) return undefined;
+  // checks.ts words a 5xx answer "Not run: the log is busy or failing"; any
+  // other retry without a network error is an answer that could not be read.
+  return c.network || c.detail.startsWith("Not run: the log is busy") ? "reach" : "unreadable";
+}
+
+function renderReport(doc: Document, report: ReceiptReport, index: number, total: number, logGiven: boolean): HTMLElement {
   const article = el(doc, "article", `report report--${report.valid ? "valid" : "invalid"}`);
   const label = total === 1 ? "The receipt" : `Receipt ${String(index + 1)} of ${String(total)}`;
-  const firstFailure = report.checks.find((c) => c.status === "failed");
-  const logFailure = failedLogCheck(report);
+  const own = report.checks.filter((c) => RECEIPT_CHECKS.includes(c.id));
+  const reason = own.find((c) => c.status === "failed") ?? own.find((c) => c.status !== "passed");
   const verdict = report.valid
-    ? `${label} is valid: signed by ${report.key ?? "the issuer key"}, and unchanged since.${logFailure === undefined ? "" : ` But the log check failed: ${logFailure.detail}`}`
-    : `${label} is not valid. ${firstFailure?.detail ?? "A check did not pass."}`;
+    ? `${label} is valid: signed by ${report.key ?? "the issuer key"}, and unchanged since.${logNote(report, logGiven)}`
+    : `${label} is not valid. ${reason === undefined ? "A check did not pass." : detailOf(reason)}`;
   article.append(el(doc, "h3", undefined, verdict));
   const list = el(doc, "ol", "checks");
   for (const c of report.checks) list.append(renderCheck(doc, c));
@@ -161,46 +245,58 @@ function renderReport(doc: Document, report: ReceiptReport, index: number, total
 }
 
 async function run(doc: Document): Promise<void> {
-  const status = byId(doc, "status");
-  const results = byId(doc, "results");
-  const list = byId(doc, "results-list");
-  const problemsBox = byId(doc, "problems");
-  problemsBox.hidden = true;
-  for (const f of doc.querySelectorAll("[aria-invalid]")) f.removeAttribute("aria-invalid");
-  status.textContent = "Checking…";
-  const form = await readForm(doc);
-  if ("problems" in form) {
-    status.textContent = "";
-    renderProblems(doc, form.problems);
-    return;
-  }
-  let reports: ReceiptReport[];
   try {
-    reports = await checkReceipts(form.receipts, form.inputs);
+    const status = byId(doc, "status");
+    const results = byId(doc, "results");
+    const list = byId(doc, "results-list");
+    const retryButton = byId(doc, "retry");
+    // Nothing from the last run stays on show while this one runs.
+    results.hidden = true;
+    list.replaceChildren();
+    retryButton.hidden = true;
+    byId(doc, "problems").hidden = true;
+    clearFieldMarks(doc);
+    status.textContent = "Checking…";
+    const form = await readForm(doc);
+    if ("problems" in form) {
+      status.textContent = "";
+      renderProblems(doc, form.problems);
+      return;
+    }
+    const logGiven = form.inputs.log !== undefined;
+    const reports = await checkReceipts(form.receipts, form.inputs);
+    list.replaceChildren(...reports.map((r, i) => renderReport(doc, r, i, reports.length, logGiven)));
+    const causes = new Set(reports.flatMap((r) => r.checks.map(retryCause)));
+    retryButton.hidden = !(causes.has("reach") || causes.has("unreadable"));
+    results.hidden = false;
+    const validCount = reports.filter((r) => r.valid).length;
+    const note = reports.map((r) => logNote(r, logGiven)).find((n) => n !== "") ?? "";
+    status.textContent =
+      `Checked ${String(reports.length)} ${reports.length === 1 ? "receipt" : "receipts"}: ${String(validCount)} valid.${note}` +
+      (causes.has("reach") ? " The log could not be reached, or was busy; you can try it again." : "") +
+      (causes.has("unreadable") ? " The log's answer could not be read; you can try it again." : "");
+    byId(doc, "results-heading").focus();
   } catch {
-    status.textContent = "The checks stopped on an error this page did not expect. Nothing was sent; reload the page and try again.";
-    return;
+    renderFailure(doc);
   }
-  list.replaceChildren(...reports.map((r, i) => renderReport(doc, r, i, reports.length)));
-  const retry = reports.some((r) => r.checks.some((c) => c.retry));
-  byId(doc, "retry").hidden = !retry;
-  results.hidden = false;
-  const validCount = reports.filter((r) => r.valid).length;
-  const logFailure = reports.map(failedLogCheck).find((c) => c !== undefined);
-  status.textContent = `Checked ${String(reports.length)} ${reports.length === 1 ? "receipt" : "receipts"}: ${String(validCount)} valid.${logFailure === undefined ? "" : ` But the log check failed: ${logFailure.detail}`}${retry ? " The log could not be reached, or was busy; you can try it again." : ""}`;
-  byId(doc, "results-heading").focus();
 }
 
 /** Reads a chosen or dropped file into a text field. */
 function loadFileInto(doc: Document, file: File, target: HTMLTextAreaElement): void {
+  const status = byId(doc, "status");
   if (file.size > MAX_INPUT_CHARS) {
-    byId(doc, "status").textContent = `${file.name} is larger than 5 MB, so it was not read.`;
+    status.textContent = `${file.name} is larger than 5 MB, so it was not read.`;
     return;
   }
-  void file.text().then((text) => {
-    target.value = text;
-    byId(doc, "status").textContent = `Read ${file.name}.`;
-  });
+  file.text().then(
+    (text) => {
+      target.value = text;
+      status.textContent = `Read ${file.name}.`;
+    },
+    () => {
+      status.textContent = `${file.name} could not be read. Choose it again, or paste its text.`;
+    },
+  );
 }
 
 function wireFiles(doc: Document): void {
@@ -209,6 +305,8 @@ function wireFiles(doc: Document): void {
     if (!(target instanceof HTMLTextAreaElement)) throw new Error(`${input.id} must load into a textarea`);
     input.addEventListener("change", () => {
       const file = input.files?.[0];
+      // Cleared, so that choosing the same file again reads it again.
+      input.value = "";
       if (file !== undefined) loadFileInto(doc, file, target);
     });
     target.addEventListener("dragover", (e) => {
@@ -230,12 +328,20 @@ export async function start(doc: Document): Promise<void> {
     return;
   }
   wireFiles(doc);
+  const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
   let running = false;
+  const busy = (on: boolean): void => {
+    running = on;
+    if (button === null) return;
+    button.disabled = on;
+    if (on) button.setAttribute("aria-disabled", "true");
+    else button.removeAttribute("aria-disabled");
+  };
   const go = (): void => {
     if (running) return;
-    running = true;
+    busy(true);
     void run(doc).finally(() => {
-      running = false;
+      busy(false);
     });
   };
   form.addEventListener("submit", (e) => {

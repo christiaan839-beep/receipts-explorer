@@ -19,10 +19,11 @@ const TIMESTAMP = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]
  * Control characters (C0, DEL and C1), the line separators U+2028 and
  * U+2029, and the bidirectional controls, which can make a logId read as
  * something other than its bytes. Copied from verifiable-receipts
- * bin/witness.mjs (UNSAFE_TEXT) at VR_REF.
+ * bin/witness.mjs (UNSAFE_TEXT) at VR_REF. The page also strips them from
+ * every check's detail, which can quote the log's own error text.
  */
 // eslint-disable-next-line no-control-regex -- matching them is the point
-const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2028\u2029\u2066-\u2069]/;
+export const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2028\u2029\u2066-\u2069]/;
 
 export type TreeHeadCheck =
   | { status: "passed"; sth: Required<SignedTreeHead>; canonical: string }
