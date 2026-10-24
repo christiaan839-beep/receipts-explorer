@@ -314,7 +314,7 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
     return result(
       id,
       "failed",
-      `${said.charAt(0).toUpperCase()}${said.slice(1)}; the log's signed tree head has root ${sth.rootHash}. Save the log's answers to /v1/sth and /v1/cosignatures?treeSize=${String(sth.treeSize)}: together they are the evidence.`,
+      `${said.charAt(0).toUpperCase()}${said.slice(1)}; the log's signed tree head has root ${sth.rootHash}. Save the log's answers to /v1/sth and /v1/cosignatures?treeSize=${String(sth.treeSize)}: together they are the evidence. If the witness is right, the log showed two different histories for one size.`,
     );
   }
   const signedBy: string[] = [];

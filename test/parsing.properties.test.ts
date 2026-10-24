@@ -241,6 +241,11 @@ const RECEIPT_EXAMPLES: [FieldMutation[], Dup, LogKind][] = [
   [[{ kind: "replace", pick: at(REAL_RECEIPT, "signature"), value: WELL_FORMED_V3 }], undefined, "honest"],
 ];
 
+/** fast-check counts examples inside numRuns: run at least as many times as there are examples, so every example runs at any FC_NUM_RUNS. */
+function atLeast(examples: readonly unknown[]): number {
+  return Math.max(fc.readConfigureGlobal().numRuns ?? NUM_RUNS, examples.length);
+}
+
 /** Fails unless every pattern matches some outcome counted. */
 function assertReached(outcomes: Map<string, number>, patterns: readonly RegExp[]): void {
   for (const reached of patterns) assert.ok([...outcomes.keys()].some((k) => reached.test(k)), `${String(reached)} never reached`);
@@ -265,7 +270,7 @@ describe("parsing never throws", () => {
           count(outcomes, outcome((e as Error).message.replace(/^The key(, block \d+,)? /, "")));
         }
       }),
-      { examples: KEY_EXAMPLES },
+      { examples: KEY_EXAMPLES, numRuns: atLeast(KEY_EXAMPLES) },
     );
     report(t, "parsePublicKeys", outcomes);
     assertReached(outcomes, [/^read 1 key/, /small order/, /not the canonical encoding/, /not an Ed25519 public key, or is damaged/]);
@@ -294,7 +299,7 @@ describe("parsing never throws", () => {
         assert.ok(treeHead && inLog && witnesses);
         count(runs, [treeHead, inLog, witnesses].map((c) => `${c.id} ${c.status}${c.status === "passed" ? "" : ` (${outcome(c.detail)})`}`).join("; "));
       }),
-      { examples: STH_EXAMPLES },
+      { examples: STH_EXAMPLES, numRuns: atLeast(STH_EXAMPLES) },
     );
     report(t, "checkTreeHead", heads);
     report(t, "checks 5 to 7", runs);
@@ -335,7 +340,7 @@ describe("parsing never throws", () => {
           count(runs, notPassed === undefined ? "all seven pass" : `${notPassed.id} ${notPassed.status}: ${outcome(notPassed.detail)}`);
         }
       }),
-      { examples: RECEIPT_EXAMPLES },
+      { examples: RECEIPT_EXAMPLES, numRuns: atLeast(RECEIPT_EXAMPLES) },
     );
     report(t, "receipt", runs);
     assertReached(runs, [

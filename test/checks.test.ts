@@ -247,7 +247,7 @@ describe("checks with a stubbed log", () => {
     assert.ok(FORK_ROOT !== "" && FORK_ROOT !== ROOT);
     assert.equal(
       c.detail,
-      `Witness ${w3.fingerprint} says the log showed it a tree head of size 3 with root ${FORK_ROOT}; the log's signed tree head has root ${ROOT}. Save the log's answers to /v1/sth and /v1/cosignatures?treeSize=3: together they are the evidence.`,
+      `Witness ${w3.fingerprint} says the log showed it a tree head of size 3 with root ${FORK_ROOT}; the log's signed tree head has root ${ROOT}. Save the log's answers to /v1/sth and /v1/cosignatures?treeSize=3: together they are the evidence. If the witness is right, the log showed two different histories for one size.`,
     );
   });
 
@@ -391,7 +391,7 @@ describe("checks with a stubbed log", () => {
     const [r] = await checkReceipts([valid], { ...i, log: { ...i.log, witnessKeys: [w3] } });
     assert.ok(r);
     assert.equal(check(r, "witnesses").status, "failed");
-    assert.match(check(r, "witnesses").detail, /together they are the evidence\.$/);
+    assert.match(check(r, "witnesses").detail, /together they are the evidence\. If the witness is right, the log showed two different histories for one size\.$/);
   });
 
   it("a cosignature's signature must be over its own text: witness 1's, moved onto witness 2's text, does not count", async () => {
