@@ -15,3 +15,4 @@ npm-debug.log*
 *.key
 .claude/settings.local.json
 src/lint-probe-*.ts
+.dist-*/
