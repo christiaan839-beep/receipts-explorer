@@ -1,0 +1,51 @@
+[
+  {
+    "id": "format",
+    "name": "Format",
+    "term": "receipt",
+    "proves": "The receipt is a v2 receipt, and its signature is written in the one valid spelling.",
+    "doesNotProve": "Nothing about who signed it or whether its content is true."
+  },
+  {
+    "id": "signature",
+    "name": "Signature",
+    "term": "issuer-key",
+    "proves": "The holder of this key signed exactly this text, and nobody changed it afterwards.",
+    "doesNotProve": "That the key belongs to the issuer you think it does: that depends on where you got the key."
+  },
+  {
+    "id": "content-hash",
+    "name": "Content hash",
+    "term": "canonical",
+    "proves": "The contentHash beside the signed text is the SHA-256 of that text.",
+    "doesNotProve": "Anything the signature does not already prove; it lets other tools find the receipt by its hash."
+  },
+  {
+    "id": "repeated-fields",
+    "name": "Repeated fields",
+    "term": "repeated-field",
+    "proves": "Every field beside the signed text says the same as the signed text.",
+    "doesNotProve": "That the action happened as recorded; only that the receipt does not contradict itself."
+  },
+  {
+    "id": "tree-head",
+    "name": "Tree head",
+    "term": "tree-head",
+    "proves": "The log's key signed this tree head: the log committed to this size and root.",
+    "doesNotProve": "That the log shows everyone the same tree head; witnesses check that."
+  },
+  {
+    "id": "in-log",
+    "name": "In the log",
+    "term": "inclusion-proof",
+    "proves": "The receipt is an entry in the tree the signed tree head commits to, so the log cannot later deny holding it.",
+    "doesNotProve": "When the action happened, or that the log holds no other receipts that contradict this one."
+  },
+  {
+    "id": "witnesses",
+    "name": "Witnesses",
+    "term": "cosignature",
+    "proves": "Independent witnesses saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the witnesses you gave cosigned another root for this size.",
+    "doesNotProve": "That the witnesses are independent of the log; that depends on who runs them."
+  }
+]
