@@ -284,13 +284,41 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
   // and root; its timestamp may differ, since the log re-signs the same
   // tree. Its text is rebuilt from its own fields and must match byte for
   // byte, and its signature must verify over that text under the witness key.
+  // One over the same log and size with another root is a fork: when its
+  // text is canonical and it verifies under a witness key, the log showed
+  // that witness another history for this size, and check 7 fails.
   const { sth } = head;
+  const matching: { signature: unknown; sthCanonical: string }[] = [];
+  const forks: { signature: unknown; sthCanonical: string; rootHash: string }[] = [];
+  for (const c of body.cosignatures as unknown[]) {
+    if (!isObject(c) || typeof c.sthCanonical !== "string") continue;
+    const covered = canonicalTreeHead(c.sthCanonical);
+    if (covered?.logId === sth.logId && covered.treeSize === sth.treeSize && covered.rootHash !== sth.rootHash) {
+      forks.push({ signature: c.signature, sthCanonical: c.sthCanonical, rootHash: covered.rootHash });
+      continue;
+    }
+    if (covered?.logId !== sth.logId || covered.treeSize !== sth.treeSize || covered.rootHash !== sth.rootHash) continue;
+    matching.push({ signature: c.signature, sthCanonical: c.sthCanonical });
+  }
+  const forkedBy: string[] = [];
+  for (const w of log.witnessKeys) {
+    for (const f of forks) {
+      if (await verifyV2Text(f.signature, f.sthCanonical, w)) {
+        forkedBy.push(`${w.fingerprint} (root ${f.rootHash})`);
+        break;
+      }
+    }
+  }
+  if (forkedBy.length > 0) {
+    return result(
+      id,
+      "failed",
+      `The witness ${forkedBy.join(", the witness ")} cosigned a tree head of the log ${sth.logId} with ${String(sth.treeSize)} entries and another root, but the log's signed tree head has the root ${sth.rootHash}. The log has shown two different histories for one size: keep both tree heads as evidence.`,
+    );
+  }
   const signedBy: string[] = [];
   for (const w of log.witnessKeys) {
-    for (const c of body.cosignatures as unknown[]) {
-      if (!isObject(c) || typeof c.sthCanonical !== "string") continue;
-      const covered = canonicalTreeHead(c.sthCanonical);
-      if (covered?.logId !== sth.logId || covered.treeSize !== sth.treeSize || covered.rootHash !== sth.rootHash) continue;
+    for (const c of matching) {
       if (await verifyV2Text(c.signature, c.sthCanonical, w)) {
         signedBy.push(w.fingerprint);
         break;
@@ -305,7 +333,19 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
   return result(id, "passed", `${String(signedBy.length)} of ${String(n)} witnesses cosigned ${what}: ${signedBy.join(", ")}.`);
 }
 
-/** All seven checks for every receipt; the log is asked for one tree head and one list of cosignatures per run. */
+const RECEIPT_UNCHECKED = "A receipt this page cannot check is not valid here; check it with the verifiable-receipts library.";
+
+/** What a result that could not be checked means, in the words of the check that threw. */
+const UNCHECKED: Record<CheckId, string> = {
+  format: RECEIPT_UNCHECKED,
+  signature: RECEIPT_UNCHECKED,
+  "content-hash": RECEIPT_UNCHECKED,
+  "repeated-fields": RECEIPT_UNCHECKED,
+  "tree-head": "A tree head this page cannot check is not trusted here; check the log with the verifiable-receipts library.",
+  "in-log": "An inclusion proof this page cannot check does not show the entry is in the log; check it with the verifiable-receipts library.",
+  witnesses: "Cosignatures this page cannot check do not count here; check them with the verifiable-receipts library.",
+};
+
 /**
  * The result of check `id` when checking threw: "not run" when this browser
  * has no WebCrypto Ed25519, and "failed" for anything else, so that a
@@ -314,7 +354,7 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
 function trouble(id: CheckId, e: unknown): CheckResult {
   if (e instanceof Ed25519Unavailable) return result(id, "not-run", `Not run: ${e.message}`);
   const what = e instanceof Error ? e.name : "an error";
-  return result(id, "failed", `This could not be checked: the page hit ${what}. A receipt this page cannot check is not valid here; check it with the verifiable-receipts library.`);
+  return result(id, "failed", `This could not be checked: the page hit ${what}. ${UNCHECKED[id]}`);
 }
 
 /** All seven checks for every receipt; the log is asked for one tree head and one list of cosignatures per run. Never throws. */
@@ -334,10 +374,9 @@ export async function checkReceipts(receipts: readonly unknown[], inputs: Inputs
   }
   const reports: ReceiptReport[] = [];
   for (const receipt of receipts) {
+    let report: ReceiptReport;
     try {
-      const report = await checkOffline(receipt, inputs.issuerKeys);
-      report.checks.push(treeHead, await inLogCheck(receipt, inputs.log, head), witnesses);
-      reports.push(report);
+      report = await checkOffline(receipt, inputs.issuerKeys);
     } catch (e) {
       const first = trouble("format", e);
       const rest = (["signature", "content-hash", "repeated-fields", "in-log"] as const).map((id) =>
@@ -351,7 +390,17 @@ export async function checkReceipts(receipts: readonly unknown[], inputs: Inputs
         action: undefined,
         repeated: [],
       });
+      continue;
     }
+    // Check 6 throwing leaves checks 1 to 4 as they are.
+    let inLog: CheckResult;
+    try {
+      inLog = await inLogCheck(receipt, inputs.log, head);
+    } catch (e) {
+      inLog = trouble("in-log", e);
+    }
+    report.checks.push(treeHead, inLog, witnesses);
+    reports.push(report);
   }
   return reports;
 }

@@ -23,6 +23,10 @@ const GOOD: Record<string, StubAnswer> = {
   [INCLUSION]: { status: 200, file: "inclusion.json" },
   "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures.json" },
 };
+/** An honest log: the same answers, with no fork among the cosignatures. */
+const CLEAN: Record<string, StubAnswer> = { ...GOOD, "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures-clean.json" } };
+const ROOT = (readJson(LOG, "sth.json") as { rootHash: string }).rootHash;
+const FORK_ROOT = (readJson(LOG, "cosignatures.json") as { cosignatures: { rootHash: string }[] }).cosignatures.at(-1)?.rootHash ?? "";
 
 const issuer = await keyFrom(CONFORMANCE, "public-key.pem");
 const logKey = await keyFrom(LOG, "log-public-key.pem");
@@ -184,6 +188,28 @@ describe("checks that throw", () => {
     assert.equal(next.valid, true);
   });
 
+  for (const [id, method] of [
+    ["tree-head", "sth"],
+    ["in-log", "inclusion"],
+    ["witnesses", "cosignatures"],
+  ] as const) {
+    it(`a throw in check ${id} fails that check alone, in words about what it checks, and checks 1 to 4 keep their results`, async () => {
+      const i = inputs(CLEAN);
+      assert.ok(i.log);
+      i.log.client[method] = () => Promise.reject(new RangeError("Maximum call stack size exceeded"));
+      const r = await one(valid, i);
+      for (const other of ["format", "signature", "content-hash", "repeated-fields"] as const) assert.equal(check(r, other).status, "passed", other);
+      const c = check(r, id);
+      assert.equal(c.status, "failed");
+      assert.match(c.detail, /^This could not be checked: the page hit RangeError\./);
+      assert.doesNotMatch(c.detail, /A receipt this page cannot check/);
+      if (id === "in-log") {
+        assert.equal(check(r, "tree-head").status, "passed");
+        assert.equal(check(r, "witnesses").status, "passed");
+      }
+    });
+  }
+
   it("no WebCrypto Ed25519: the signature checks are not run, never failed", async () => {
     const original = crypto.subtle.verify.bind(crypto.subtle);
     crypto.subtle.verify = () => Promise.reject(new DOMException("no Ed25519", "NotSupportedError"));
@@ -201,14 +227,47 @@ describe("checks that throw", () => {
 });
 
 describe("checks with a stubbed log", () => {
-  it("every check passes against an honest log, with 2 of 3 witnesses", async () => {
+  it("every check passes against an honest log, with 2 of 3 witnesses, each counted once however often it is listed", async () => {
     const requests: string[] = [];
-    const r = await one(valid, inputs(GOOD, requests));
+    const r = await one(valid, inputs(CLEAN, requests));
     assert.ok(r.checks.every((c) => c.status === "passed"), JSON.stringify(r.checks));
     assert.match(check(r, "in-log").detail, /^Entry 1 of 3 in the log stub-log/);
     assert.match(check(r, "witnesses").detail, /^2 of 3 witnesses cosigned/);
     assert.ok(requests.every((x) => x.startsWith("GET https://log.test/")), requests.join("\n"));
     assert.equal(requests.length, 3);
+  });
+
+  it("a log whose witness 3 cosigned a fork: checks 1 to 6 pass, and check 7 fails, naming the witness and both roots", async () => {
+    const r = await one(valid, inputs(GOOD));
+    assert.deepEqual(statuses(r).slice(0, 6), ["format:passed", "signature:passed", "content-hash:passed", "repeated-fields:passed", "tree-head:passed", "in-log:passed"]);
+    const c = check(r, "witnesses");
+    assert.equal(c.status, "failed");
+    const w3 = witnesses[2];
+    assert.ok(w3);
+    assert.ok(FORK_ROOT !== "" && FORK_ROOT !== ROOT);
+    for (const part of [w3.fingerprint, ROOT, FORK_ROOT, "keep both tree heads as evidence"]) assert.ok(c.detail.includes(part), `${part} in ${c.detail}`);
+  });
+
+  it("a fork cosignature that verifies under no witness key you gave is skipped: check 7 passes", async () => {
+    const r = await one(valid, inputs({ ...GOOD, "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures-unverified-fork.json" } }));
+    assert.equal(check(r, "witnesses").status, "passed");
+    assert.match(check(r, "witnesses").detail, /^2 of 3 witnesses cosigned/);
+  });
+
+  it("a valid proof for another entry of the same tree, with that entry's leaf hash, fails check 6", async () => {
+    const r = await one(valid, inputs({ ...CLEAN, [INCLUSION]: { status: 200, file: "inclusion-other-leaf.json" } }));
+    assert.equal(check(r, "tree-head").status, "passed");
+    assert.equal(check(r, "in-log").status, "failed");
+    assert.match(check(r, "in-log").detail, /a proof for a different entry/);
+  });
+
+  it("a signed tree head of the empty log fails check 6: the log is empty", async () => {
+    const requests: string[] = [];
+    const r = await one(valid, inputs({ ...CLEAN, "/v1/sth": { status: 200, file: "sth-empty.json" } }, requests));
+    assert.equal(check(r, "tree-head").status, "passed");
+    assert.equal(check(r, "in-log").status, "failed");
+    assert.match(check(r, "in-log").detail, /^The log is empty/);
+    assert.equal(requests.filter((x) => x.includes("/v1/proof/inclusion")).length, 0);
   });
 
   it("an unreachable log is a network error: not run, never failed", async () => {
@@ -303,6 +362,7 @@ describe("checks with a stubbed log", () => {
     const [r] = await checkReceipts([valid], { ...i, log: { ...i.log, witnessKeys: [w3] } });
     assert.ok(r);
     assert.equal(check(r, "witnesses").status, "failed");
+    assert.match(check(r, "witnesses").detail, /keep both tree heads as evidence/);
   });
 
   it("a cosignature's signature must be over its own text: witness 1's, moved onto witness 2's text, does not count", async () => {
