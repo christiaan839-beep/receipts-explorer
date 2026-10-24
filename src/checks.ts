@@ -230,7 +230,7 @@ async function treeHeadCheck(log: LogInputs | undefined): Promise<{ check: Check
   const head = await checkTreeHead(answer.body, log.logKey);
   if (head.status === "passed") {
     const { sth } = head;
-    return { check: result(id, "passed", `The log ${sth.logId} signed a tree of ${String(sth.treeSize)} entries at ${sth.timestamp}, under the key ${log.logKey.fingerprint}.`), head };
+    return { check: result(id, "passed", `The log ${show(sth.logId)} signed a tree of ${String(sth.treeSize)} entries at ${sth.timestamp}, under the key ${log.logKey.fingerprint}.`), head };
   }
   return { check: result(id, head.status, head.reason), head };
 }
@@ -261,7 +261,7 @@ async function inLogCheck(receipt: unknown, log: LogInputs | undefined, head: Tr
   if (proof.treeSize !== sth.treeSize) return result(id, "failed", "The log answered with a proof for a different tree size than its signed tree head. Try again; if it happens again, the log may be misbehaving.");
   // The proof's own rootHashHex is never trusted: the root comes from the signed tree head.
   if (await verifyInclusionProof(leaf, proof.leafIndex, sth.treeSize, proof.auditPath, sth.rootHash)) {
-    return result(id, "passed", `Entry ${String(proof.leafIndex)} of ${String(sth.treeSize)} in the log ${sth.logId}, with leaf hash ${leaf}.`);
+    return result(id, "passed", `Entry ${String(proof.leafIndex)} of ${String(sth.treeSize)} in the log ${show(sth.logId)}, with leaf hash ${leaf}.`);
   }
   return result(id, "failed", "The log's proof does not lead to the root in its signed tree head. Keep the receipt and the tree head as evidence: the log may be misbehaving.");
 }
@@ -304,16 +304,17 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
   for (const w of log.witnessKeys) {
     for (const f of forks) {
       if (await verifyV2Text(f.signature, f.sthCanonical, w)) {
-        forkedBy.push(`${w.fingerprint} (root ${f.rootHash})`);
+        forkedBy.push(`witness ${w.fingerprint} says the log showed it a tree head of size ${String(sth.treeSize)} with root ${f.rootHash}`);
         break;
       }
     }
   }
   if (forkedBy.length > 0) {
+    const said = forkedBy.join("; ");
     return result(
       id,
       "failed",
-      `The witness ${forkedBy.join(", the witness ")} cosigned a tree head of the log ${sth.logId} with ${String(sth.treeSize)} entries and another root, but the log's signed tree head has the root ${sth.rootHash}. The log has shown two different histories for one size: keep both tree heads as evidence.`,
+      `${said.charAt(0).toUpperCase()}${said.slice(1)}; the log's signed tree head has root ${sth.rootHash}. Save the log's answers to /v1/sth and /v1/cosignatures?treeSize=${String(sth.treeSize)}: together they are the evidence.`,
     );
   }
   const signedBy: string[] = [];
@@ -326,7 +327,7 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
     }
   }
   const n = log.witnessKeys.length;
-  const what = `a tree head of the log ${sth.logId} with ${String(sth.treeSize)} entries and this root`;
+  const what = `a tree head of the log ${show(sth.logId)} with ${String(sth.treeSize)} entries and this root`;
   if (signedBy.length === 0) {
     return result(id, "failed", `None of the ${String(n)} witness keys you gave cosigned ${what}. Witnesses cosign on their own schedule, so try again later; if it stays at none, check that you have the witnesses' keys.`);
   }
@@ -349,7 +350,9 @@ const UNCHECKED: Record<CheckId, string> = {
 /**
  * The result of check `id` when checking threw: "not run" when this browser
  * has no WebCrypto Ed25519, and "failed" for anything else, so that a
- * receipt the page cannot check is never left on "Checking…" and never valid.
+ * check is never left on "Checking…". A throw in checks 1 to 4 also makes
+ * the receipt not valid; a throw in check 5, 6 or 7 fails that check alone,
+ * and the verdict of checks 1 to 4 stands.
  */
 function trouble(id: CheckId, e: unknown): CheckResult {
   if (e instanceof Ed25519Unavailable) return result(id, "not-run", `Not run: ${e.message}`);

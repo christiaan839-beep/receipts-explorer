@@ -15,7 +15,7 @@ import { parsePublicKeys } from "../src/keys.ts";
 import { LogClient, parseLogAddress } from "../src/log-client.ts";
 import { checkTreeHead } from "../src/tree-head.ts";
 import { verifyV2Receipt } from "../src/vendor/verifiable-receipts/receipt.ts";
-import { CONFORMANCE, LOG, keyFrom, makeKey, readText, signReceipt } from "./helpers.ts";
+import { CONFORMANCE, LOG, WELL_FORMED_V3, keyFrom, makeKey, readText, signReceipt } from "./helpers.ts";
 import { body, mutate, mutation } from "./mutations.ts";
 import { LOG_BASE } from "./stub-log.ts";
 
@@ -124,14 +124,17 @@ function asText(value: Record<string, unknown>, dup: { pick: number; value: unkn
   return dup.first ? `{${pair},${text.slice(1)}` : `${text.slice(0, -1)},${pair}}`;
 }
 
-/** A log that serves `sth` as its tree head, and the honest log's proof and cosignatures. */
-function logServing(sth: string): Inputs["log"] {
+/** What the stub log answers besides its tree head: the honest log's proof and cosignatures, a proof that does not lead to the signed root, or cosignatures with a witness-signed fork. */
+type LogKind = "honest" | "lying-proof" | "fork";
+
+/** A log that serves `sth` as its tree head, and the proof and cosignatures that `kind` names. */
+function logServing(sth: string, kind: LogKind = "honest"): Inputs["log"] {
   const answer = (body: string): Promise<Response> => Promise.resolve(new Response(body, { status: 200, headers: { "Content-Type": "application/json" } }));
   const client = new LogClient(LOG_BASE, (url) => {
     const path = new URL(url).pathname;
     if (path === "/v1/sth") return answer(sth);
-    if (path === "/v1/proof/inclusion") return answer(readText(LOG, "inclusion.json"));
-    return answer(readText(LOG, "cosignatures-clean.json"));
+    if (path === "/v1/proof/inclusion") return answer(readText(LOG, kind === "lying-proof" ? "inclusion-lying-root.json" : "inclusion.json"));
+    return answer(readText(LOG, kind === "fork" ? "cosignatures.json" : "cosignatures-clean.json"));
   });
   return { client, logKey: LOG_KEY, witnessKeys: WITNESS_KEYS };
 }
@@ -188,7 +191,60 @@ const mutatedKeyPem = fc
     fc.constantFrom(...WEAK_POINTS).map((point) => Buffer.concat([REAL_DER.subarray(0, 12), Buffer.from(point, "hex")])),
     fc.constant(REAL_DER),
   )
-  .map((der) => `-----BEGIN PUBLIC KEY-----\n${der.toString("base64")}\n-----END PUBLIC KEY-----\n`);
+  .map(keyPem);
+
+function keyPem(der: Buffer): string {
+  return `-----BEGIN PUBLIC KEY-----\n${der.toString("base64")}\n-----END PUBLIC KEY-----\n`;
+}
+
+/** Examples run on every run of the property, whatever FC_NUM_RUNS is: the real key, a damaged one, and every weak point. */
+const KEY_EXAMPLES: [string][] = [[keyPem(REAL_DER)], [keyPem(REAL_DER.subarray(0, 40))], ...WEAK_POINTS.map((point): [string] => [keyPem(Buffer.concat([REAL_DER.subarray(0, 12), Buffer.from(point, "hex")]))])];
+
+/** The index of `key` among the real tree head's or receipt's keys, for the examples. */
+function at(value: Record<string, unknown>, key: string): number {
+  const i = Object.keys(value).indexOf(key);
+  assert.ok(i >= 0, key);
+  return i;
+}
+
+/** The real receipt's signature, respelled with non-zero padding bits: the same bytes, a spelling no signer writes. */
+function paddedSignature(): string {
+  const sig = String(REAL_RECEIPT.signature);
+  const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  return sig.slice(0, -3) + B64.charAt((B64.indexOf(sig.charAt(sig.length - 3)) & 0x30) | 1) + "==";
+}
+
+type Dup = { pick: number; value: unknown; first: boolean } | undefined;
+
+/** Tree head changes run on every run of the property, so each outcome asserted below is reached at any FC_NUM_RUNS. */
+const STH_EXAMPLES: [FieldMutation[], Dup][] = [
+  [[], undefined],
+  [[{ kind: "flip", pick: at(REAL_STH, "signature"), pos: 0, mask: 1 }], undefined],
+  [[{ kind: "drop", pick: at(REAL_STH, "v") }], undefined],
+  [[{ kind: "drop", pick: at(REAL_STH, "logId") }], undefined],
+  [[{ kind: "replace", pick: at(REAL_STH, "treeSize"), value: "3" }], undefined],
+  [[{ kind: "add", name: "extra", value: 1 }], undefined],
+  [[{ kind: "drop", pick: at(REAL_STH, "signature") }], undefined],
+  [[{ kind: "replace", pick: at(REAL_STH, "signature"), value: WELL_FORMED_V3 }], undefined],
+  [[{ kind: "replace", pick: at(REAL_STH, "signature"), value: "v2=" + "A".repeat(84) }], undefined],
+];
+
+/** Receipt changes and log answers run on every run of the property. */
+const RECEIPT_EXAMPLES: [FieldMutation[], Dup, LogKind][] = [
+  [[], undefined, "honest"],
+  [[], undefined, "lying-proof"],
+  [[], undefined, "fork"],
+  [[{ kind: "drop", pick: at(REAL_RECEIPT, "canonical") }], undefined, "honest"],
+  [[{ kind: "replace", pick: at(REAL_RECEIPT, "signature"), value: "v2=!!!!" }], undefined, "honest"],
+  [[{ kind: "replace", pick: at(REAL_RECEIPT, "signature"), value: paddedSignature() }], undefined, "honest"],
+  [[{ kind: "replace", pick: at(REAL_RECEIPT, "signature"), value: "v2=" + "A".repeat(84) }], undefined, "honest"],
+  [[{ kind: "replace", pick: at(REAL_RECEIPT, "signature"), value: WELL_FORMED_V3 }], undefined, "honest"],
+];
+
+/** Fails unless every pattern matches some outcome counted. */
+function assertReached(outcomes: Map<string, number>, patterns: readonly RegExp[]): void {
+  for (const reached of patterns) assert.ok([...outcomes.keys()].some((k) => reached.test(k)), `${String(reached)} never reached`);
+}
 
 describe("parsing never throws", () => {
   it("parseReceipts", () => {
@@ -209,11 +265,10 @@ describe("parsing never throws", () => {
           count(outcomes, outcome((e as Error).message.replace(/^The key(, block \d+,)? /, "")));
         }
       }),
+      { examples: KEY_EXAMPLES },
     );
     report(t, "parsePublicKeys", outcomes);
-    for (const reached of [/^read 1 key/, /small order/, /not the canonical encoding/, /not an Ed25519 public key, or is damaged/]) {
-      assert.ok([...outcomes.keys()].some((k) => reached.test(k)), `${String(reached)} never reached`);
-    }
+    assertReached(outcomes, [/^read 1 key/, /small order/, /not the canonical encoding/, /not an Ed25519 public key, or is damaged/]);
   });
   it("checkTreeHead and checkOffline", async () => {
     await fc.assert(
@@ -239,18 +294,28 @@ describe("parsing never throws", () => {
         assert.ok(treeHead && inLog && witnesses);
         count(runs, [treeHead, inLog, witnesses].map((c) => `${c.id} ${c.status}${c.status === "passed" ? "" : ` (${outcome(c.detail)})`}`).join("; "));
       }),
+      { examples: STH_EXAMPLES },
     );
     report(t, "checkTreeHead", heads);
     report(t, "checks 5 to 7", runs);
-    assert.ok((heads.get("passed") ?? 0) > 0, "the real tree head never passed");
-    assert.ok(heads.size >= 6, `only ${String(heads.size)} tree head outcomes`);
+    assertReached(heads, [
+      /^passed$/,
+      /^failed: The tree head's signature does not verify under the log key you gave\.$/,
+      /^failed: The tree head is not version/,
+      /^failed: The tree head has no logId\.$/,
+      /^failed: The tree head's treeSize is not a whole number/,
+      /^failed: The tree head has a field its signature does not cover/,
+      /^failed: The tree head's signature is missing or is not a well-formed v2= signature\.$/,
+      /^not-run: This log signs its tree heads with v3=/,
+      /^failed: The tree head's signature is not # bytes long/,
+    ]);
   });
 
   it("a real signed receipt, changed field by field: parseReceipts, checkOffline and all seven checks never throw", async (t) => {
     const runs = new Map<string, number>();
-    const log = logServing(readText(LOG, "sth.json"));
+    const sth = readText(LOG, "sth.json");
     await fc.assert(
-      fc.asyncProperty(fieldMutations, duplicate, async (ms, dup) => {
+      fc.asyncProperty(fieldMutations, duplicate, fc.constantFrom<LogKind>("honest", "lying-proof", "fork"), async (ms, dup, kind) => {
         const changed = ms.reduce(applyField, REAL_RECEIPT);
         const offline = await checkOffline(changed, [ISSUER_KEY]);
         assert.deepEqual(
@@ -262,7 +327,7 @@ describe("parsing never throws", () => {
           count(runs, `not read: ${outcome(parsed.reason)}`);
           return;
         }
-        const reports = await checkReceipts(parsed.receipts, { issuerKeys: [ISSUER_KEY], log });
+        const reports = await checkReceipts(parsed.receipts, { issuerKeys: [ISSUER_KEY], log: logServing(sth, kind) });
         assert.equal(reports.length, parsed.receipts.length);
         for (const r of reports) {
           assertSevenChecks(r);
@@ -270,10 +335,19 @@ describe("parsing never throws", () => {
           count(runs, notPassed === undefined ? "all seven pass" : `${notPassed.id} ${notPassed.status}: ${outcome(notPassed.detail)}`);
         }
       }),
+      { examples: RECEIPT_EXAMPLES },
     );
     report(t, "receipt", runs);
-    assert.ok((runs.get("all seven pass") ?? 0) > 0, "the real receipt never passed");
-    assert.ok(runs.size >= 6, `only ${String(runs.size)} receipt outcomes`);
+    assertReached(runs, [
+      /^all seven pass$/,
+      /^in-log failed: The log's proof does not lead to the root in its signed tree head\.$/,
+      /^witnesses failed: Witness # says the log showed it a tree head of size # with root #; the log's signed tree head has root #\.$/,
+      /^format failed: The receipt has no canonical text/,
+      /^format failed: The signature is not valid base64 after v2=\.$/,
+      /^format failed: The signature is spelled in a way no signer writes/,
+      /^format failed: The signature is the wrong size/,
+      /^format failed: This is a v3 receipt/,
+    ]);
   });
 });
 

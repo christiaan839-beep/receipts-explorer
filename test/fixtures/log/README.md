@@ -20,6 +20,9 @@ bytes.
 | `cosignatures-clean.json` | `GET /v1/cosignatures?treeSize=3` from an honest log: witness 1 over `sth.json` and over a later signing of the same tree; witness 2 over an earlier signing (same size and root, another timestamp), listed twice; witness 3 over `sth.json`'s text with a space added, which is not canonical and does not count; and two other roots that are not forks: witness 1 over the log's tree of 2 entries, witness 2 over a tree of 3 entries of another log |
 | `cosignatures.json` | the same, and witness 3 over a fork (same log and size, another root) in canonical text under its own key: evidence the log showed two histories |
 | `cosignatures-unverified-fork.json` | the same as the clean list, and the fork signed by `other-public-key.pem`, which no test gives as a witness key |
+| `cosignatures-fork-noncanonical.json` | the clean list, and witness 3 over the fork's text with a space added: not canonical, so not a fork, and skipped |
+| `cosignatures-fork-by-w1.json` | the clean list, and witness 1, which also cosigned the right root, over the fork |
+| `cosignatures-fork-by-w1-w3.json` | the clean list, and witnesses 1 and 3 over the fork: both are named |
 | `witness-1.pem`, `witness-2.pem`, `witness-3.pem` | the witnesses' keys |
 | `other-public-key.pem` | a key that is no one's here: not the log's, the issuer's or a witness's; it signed only the fork in `cosignatures-unverified-fork.json` |
 

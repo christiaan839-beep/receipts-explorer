@@ -231,7 +231,7 @@ describe("checks with a stubbed log", () => {
     const requests: string[] = [];
     const r = await one(valid, inputs(CLEAN, requests));
     assert.ok(r.checks.every((c) => c.status === "passed"), JSON.stringify(r.checks));
-    assert.match(check(r, "in-log").detail, /^Entry 1 of 3 in the log stub-log/);
+    assert.match(check(r, "in-log").detail, /^Entry 1 of 3 in the log "stub-log"/);
     assert.match(check(r, "witnesses").detail, /^2 of 3 witnesses cosigned/);
     assert.ok(requests.every((x) => x.startsWith("GET https://log.test/")), requests.join("\n"));
     assert.equal(requests.length, 3);
@@ -245,13 +245,42 @@ describe("checks with a stubbed log", () => {
     const w3 = witnesses[2];
     assert.ok(w3);
     assert.ok(FORK_ROOT !== "" && FORK_ROOT !== ROOT);
-    for (const part of [w3.fingerprint, ROOT, FORK_ROOT, "keep both tree heads as evidence"]) assert.ok(c.detail.includes(part), `${part} in ${c.detail}`);
+    assert.equal(
+      c.detail,
+      `Witness ${w3.fingerprint} says the log showed it a tree head of size 3 with root ${FORK_ROOT}; the log's signed tree head has root ${ROOT}. Save the log's answers to /v1/sth and /v1/cosignatures?treeSize=3: together they are the evidence.`,
+    );
   });
 
   it("a fork cosignature that verifies under no witness key you gave is skipped: check 7 passes", async () => {
     const r = await one(valid, inputs({ ...GOOD, "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures-unverified-fork.json" } }));
     assert.equal(check(r, "witnesses").status, "passed");
     assert.match(check(r, "witnesses").detail, /^2 of 3 witnesses cosigned/);
+  });
+
+  it("a witness-signed fork in text that is not canonical is skipped: check 7 passes", async () => {
+    const r = await one(valid, inputs({ ...GOOD, "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures-fork-noncanonical.json" } }));
+    assert.equal(check(r, "witnesses").status, "passed");
+    assert.match(check(r, "witnesses").detail, /^2 of 3 witnesses cosigned/);
+  });
+
+  it("witness 1 cosigned the right root and also a fork: check 7 fails, naming witness 1 and no other", async () => {
+    const r = await one(valid, inputs({ ...GOOD, "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures-fork-by-w1.json" } }));
+    const c = check(r, "witnesses");
+    assert.equal(c.status, "failed");
+    const [w1, w2, w3] = witnesses;
+    assert.ok(w1 && w2 && w3);
+    assert.match(c.detail, new RegExp(`^Witness ${w1.fingerprint} says the log showed it a tree head of size 3 with root ${FORK_ROOT}; the log's signed tree head has root ${ROOT}\\.`));
+    for (const w of [w2, w3]) assert.ok(!c.detail.includes(w.fingerprint), w.fingerprint);
+  });
+
+  it("witnesses 1 and 3 both cosigned a fork: check 7 names both, and not witness 2", async () => {
+    const r = await one(valid, inputs({ ...GOOD, "/v1/cosignatures?treeSize=3": { status: 200, file: "cosignatures-fork-by-w1-w3.json" } }));
+    const c = check(r, "witnesses");
+    assert.equal(c.status, "failed");
+    const [w1, w2, w3] = witnesses;
+    assert.ok(w1 && w2 && w3);
+    assert.match(c.detail, new RegExp(`^Witness ${w1.fingerprint} says .*; witness ${w3.fingerprint} says the log showed it a tree head of size 3 with root ${FORK_ROOT}; the log's signed tree head has root ${ROOT}\\.`));
+    assert.ok(!c.detail.includes(w2.fingerprint));
   });
 
   it("a valid proof for another entry of the same tree, with that entry's leaf hash, fails check 6", async () => {
@@ -351,7 +380,7 @@ describe("checks with a stubbed log", () => {
     const [r] = await checkReceipts([valid], { ...i, log: { ...i.log, witnessKeys: [w2] } });
     assert.ok(r);
     assert.equal(check(r, "witnesses").status, "passed");
-    assert.match(check(r, "witnesses").detail, /^1 of 1 witnesses cosigned a tree head of the log stub-log with 3 entries and this root: sha256:/);
+    assert.match(check(r, "witnesses").detail, /^1 of 1 witnesses cosigned a tree head of the log "stub-log" with 3 entries and this root: sha256:/);
   });
 
   it("only witness 3, which cosigned a fork and a non-canonical text: check 7 fails", async () => {
@@ -362,7 +391,7 @@ describe("checks with a stubbed log", () => {
     const [r] = await checkReceipts([valid], { ...i, log: { ...i.log, witnessKeys: [w3] } });
     assert.ok(r);
     assert.equal(check(r, "witnesses").status, "failed");
-    assert.match(check(r, "witnesses").detail, /keep both tree heads as evidence/);
+    assert.match(check(r, "witnesses").detail, /together they are the evidence\.$/);
   });
 
   it("a cosignature's signature must be over its own text: witness 1's, moved onto witness 2's text, does not count", async () => {

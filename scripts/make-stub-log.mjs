@@ -131,4 +131,10 @@ write("cosignatures-clean.json", { treeSize: 3, cosignatures: clean });
 write("cosignatures.json", { treeSize: 3, cosignatures: [...clean, cosig(witnesses[2], "w3", fork)] });
 // The same fork, but signed by a key nobody gives as a witness's.
 write("cosignatures-unverified-fork.json", { treeSize: 3, cosignatures: [...clean, cosig(other, "w3", fork)] });
+// The same fork in text that is not canonical (a space added), signed by witness 3: not a fork, since the text is not a tree head's.
+write("cosignatures-fork-noncanonical.json", { treeSize: 3, cosignatures: [...clean, cosig(witnesses[2], "w3", fork.replace(":3,", ": 3,"))] });
+// The fork signed by witness 1, which also cosigned the right root: still a fork.
+write("cosignatures-fork-by-w1.json", { treeSize: 3, cosignatures: [...clean, cosig(witnesses[0], "w1", fork)] });
+// The fork signed by witnesses 1 and 3: both are named.
+write("cosignatures-fork-by-w1-w3.json", { treeSize: 3, cosignatures: [...clean, cosig(witnesses[0], "w1", fork), cosig(witnesses[2], "w3", fork)] });
 console.log(`wrote ${OUT.pathname}`);
