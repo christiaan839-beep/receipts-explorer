@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Every flow of the check page, against the stubbed log.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { HONEST, ISSUER, LOG, TAMPERED, VALID, fill, fingerprint, recordRequests, statusOf, stubLog } from "./helpers.ts";
 
@@ -145,18 +145,25 @@ test("nothing is stored, nothing goes in the address bar, and nothing goes anywh
   }
 });
 
-test("a browser without WebCrypto Ed25519 is told so, and no checks run", async ({ page }) => {
+test("a browser without WebCrypto Ed25519, or whose WebCrypto says yes to everything, is told so, and no checks run", async ({ page, context }) => {
   await page.addInitScript(() => {
     const original = crypto.subtle.importKey.bind(crypto.subtle);
     crypto.subtle.importKey = ((...args: Parameters<SubtleCrypto["importKey"]>) => {
       const alg = args[2];
-      if ((typeof alg === "string" ? alg : alg.name) === "Ed25519") return Promise.reject(new DOMException("NotSupportedError"));
+      if ((typeof alg === "string" ? alg : alg.name) === "Ed25519") return Promise.reject(new DOMException("Ed25519", "NotSupportedError"));
       return original(...args);
     }) as SubtleCrypto["importKey"];
   });
   await page.goto("./");
   await expect(page.getByText("This browser cannot check Ed25519 signatures")).toBeVisible();
   await expect(page.locator("#check-form")).toBeHidden();
+  const yes = await context.newPage();
+  await yes.addInitScript(() => {
+    crypto.subtle.verify = () => Promise.resolve(true);
+  });
+  await yes.goto("./");
+  await expect(yes.getByText("This browser cannot check Ed25519 signatures")).toBeVisible();
+  await expect(yes.locator("#check-form")).toBeHidden();
 });
 
 test("inside another site's frame, the page refuses to run and says so", async ({ page, context, baseURL, browserName }) => {
@@ -180,16 +187,18 @@ test("the whole flow works from the keyboard", async ({ page, browserName }) => 
   // WebKit, like Safari, moves Tab past links and buttons unless the visitor
   // asks it not to; Option-Tab (Alt+Tab) reaches every one, as in Safari.
   const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+  /** Presses Tab until `target` has focus, at most `max` times. */
+  const tabTo = async (target: Locator, max: number): Promise<void> => {
+    for (let i = 0; i < max && !(await target.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press(tab);
+    await expect(target).toBeFocused();
+  };
   await page.keyboard.press(tab);
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
-  await page.getByLabel("Receipt", { exact: true }).focus();
+  await tabTo(page.getByLabel("Receipt", { exact: true }), 10);
   await page.keyboard.insertText(VALID);
-  await page.getByLabel("Issuer's public key").focus();
+  await tabTo(page.getByLabel("Issuer's public key"), 5);
   await page.keyboard.insertText(ISSUER);
-  for (let i = 0; i < 5 && !(await page.getByRole("button", { name: "Check" }).evaluate((b) => b === document.activeElement)); i++) {
-    await page.keyboard.press(tab);
-  }
-  await expect(page.getByRole("button", { name: "Check" })).toBeFocused();
+  await tabTo(page.getByRole("button", { name: "Check" }), 5);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("status")).toHaveText("Checked 1 receipt: 1 valid.");
   await expect(page.locator("#results-heading")).toBeFocused();
