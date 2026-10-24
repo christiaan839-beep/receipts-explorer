@@ -9,6 +9,9 @@ import { parseReceipt } from "../src/vendor/verifiable-receipts/receipt.ts";
 export const CONFORMANCE = new URL("./fixtures/conformance/", import.meta.url);
 export const LOG = new URL("./fixtures/log/", import.meta.url);
 
+/** A v3= signature in the one shape verifiable-receipts accepts: 64 bytes, ".", then 3,309 bytes. */
+export const WELL_FORMED_V3 = "v3=" + "A".repeat(85) + "A==." + "A".repeat(4412);
+
 export function readText(dir: URL, name: string): string {
   return readFileSync(new URL(name, dir), "utf8");
 }

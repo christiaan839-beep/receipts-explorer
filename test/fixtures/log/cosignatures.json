@@ -1,0 +1,45 @@
+{
+  "treeSize": 3,
+  "cosignatures": [
+    {
+      "witnessId": "w1",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T12:00:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=msFfv78W60q7N+V0aohmAA3FEZtP6tbVH2SooFMXCC4ifp7+dwY/06bmtXBTD/AaInVUnZ6PQA7YiDpSMH1yDw==",
+      "publicKeyUrl": "https://witness.example/w1.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w2",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T11:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T11:00:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=4sK8EShm33m2bW4sJKeT1WpPyCjX9LaaeMloqUM1Cn2JdcCiIhtV1ktX2CLveHZKeS/d9czQJmXae0mJhV3tAw==",
+      "publicKeyUrl": "https://witness.example/w2.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w3",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T11:30:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339\",\"timestamp\":\"2026-10-23T11:30:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=R/oRVI16Kiyu6G2PeINmT5GhHAkx5xQyJScI4jEl7CERmMi25gGLESZOi13FCTI4Gluwr/1qQvS1Vv+7MIY0Cg==",
+      "publicKeyUrl": "https://witness.example/w3.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w3",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T12:00:00.000Z\",\"treeSize\": 3,\"v\":1}",
+      "signature": "v2=9I9xo3x8tA4+DZ8c9ubjmWfUKi94f7zePF061Gda60dTmhA81NR4krvBwzoSAeXO/OMFPwn8kcv7jEibNllzBA==",
+      "publicKeyUrl": "https://witness.example/w3.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    }
+  ]
+}

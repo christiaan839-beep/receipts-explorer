@@ -1,0 +1,12 @@
+{
+  "kind": "inclusion",
+  "logId": "stub-log",
+  "leafHashHex": "9097244adc2121830afc9e540b91a7f9f50c0c8159756ac7a4d26effe0caacbd",
+  "leafIndex": 1,
+  "treeSize": 3,
+  "auditPath": [
+    "6144789e78cf0ba84d628a7190abafcd761be37400ad82f8323c36a4e8c2c3a6",
+    "797a20d4e502b310d7673b7180b7da4d4350de9e1b30beea9941e79c43420da4"
+  ],
+  "rootHashHex": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6"
+}
