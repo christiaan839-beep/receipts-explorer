@@ -304,6 +304,7 @@ describe("checks with a stubbed log", () => {
     for (const id of ["tree-head", "in-log", "witnesses"] as const) assert.equal(check(r, id).status, "not-run");
     assert.equal(check(r, "tree-head").network, true);
     assert.equal(check(r, "tree-head").retry, true);
+    assert.equal(check(r, "tree-head").cause, "network");
     assert.match(check(r, "tree-head").detail, /Could not reach the log at log\.test/);
   });
 
@@ -338,14 +339,14 @@ describe("checks with a stubbed log", () => {
     const r = await one(valid, inputs({ ...GOOD, [INCLUSION]: { status: 503, file: "busy.json" } }));
     assert.equal(check(r, "tree-head").status, "passed");
     const c = check(r, "in-log");
-    assert.deepEqual([c.status, c.network, c.retry], ["not-run", false, true]);
+    assert.deepEqual([c.status, c.network, c.retry, c.cause], ["not-run", false, true, "busy"]);
     assert.match(c.detail, /busy or failing \(it answered 503: server busy\)/);
   });
 
   it("a 400 from the log is not run, and not offered as a retry", async () => {
     const r = await one(valid, inputs({ ...GOOD, "/v1/sth": { status: 400, file: "not-found.json" } }));
     const c = check(r, "tree-head");
-    assert.deepEqual([c.status, c.retry], ["not-run", false]);
+    assert.deepEqual([c.status, c.retry, c.cause], ["not-run", false, undefined]);
   });
 
   // An answer that is not JSON (here, an empty body) is unreadable: not run, with a retry, never a verdict.
@@ -357,7 +358,7 @@ describe("checks with a stubbed log", () => {
     it(`an unreadable answer for ${id} is not run, can be retried, and is not a network error`, async () => {
       const r = await one(valid, inputs({ ...GOOD, [route]: { status: 200 } }));
       const c = check(r, id);
-      assert.deepEqual([c.status, c.network, c.retry], ["not-run", false, true]);
+      assert.deepEqual([c.status, c.network, c.retry, c.cause], ["not-run", false, true, "unreadable"]);
       assert.match(c.detail, /^Not run: The log at log\.test answered \(status 200\), but its answer is not JSON\./);
     });
   }

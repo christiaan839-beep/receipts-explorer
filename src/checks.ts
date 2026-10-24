@@ -26,6 +26,8 @@ export interface CheckResult {
   network: boolean;
   /** True when asking the log again may give an answer: a network error, or the log was busy or failing (5xx). */
   retry: boolean;
+  /** Why asking the log again may help: no answer, a busy or failing log (5xx), or an answer that could not be read. Set exactly when retry is. */
+  cause?: "network" | "busy" | "unreadable";
 }
 
 export interface RepeatedField {
@@ -66,10 +68,15 @@ function result(id: CheckId, status: Status, detail: string, network = false, re
   return { id, status, detail, network, retry };
 }
 
+/** Check `id` not run, for a reason that asking the log again may clear. */
+function retryable(id: CheckId, detail: string, cause: NonNullable<CheckResult["cause"]>): CheckResult {
+  return { ...result(id, "not-run", detail, cause === "network", true), cause };
+}
+
 /** Check `id` not run because the log answered `status` instead of 200; 5xx answers can be retried. */
 function logAnswered(id: CheckId, status: number, body: unknown): CheckResult {
   if (status >= 500) {
-    return result(id, "not-run", `Not run: the log is busy or failing (it answered ${String(status)}: ${logError(body)}). Try again in a minute.`, false, true);
+    return retryable(id, `Not run: the log is busy or failing (it answered ${String(status)}: ${logError(body)}). Try again in a minute.`, "busy");
   }
   return result(id, "not-run", `Not run: the log answered ${String(status)} (${logError(body)}). Check the log address.`);
 }
@@ -222,8 +229,8 @@ async function treeHeadCheck(log: LogInputs | undefined): Promise<{ check: Check
     };
   }
   const answer = await log.client.sth();
-  if (answer.kind === "network") return { check: result(id, "not-run", answer.detail, true), head: undefined };
-  if (answer.kind === "unreadable") return { check: result(id, "not-run", `Not run: ${answer.detail}`, false, true), head: undefined };
+  if (answer.kind === "network") return { check: retryable(id, answer.detail, "network"), head: undefined };
+  if (answer.kind === "unreadable") return { check: retryable(id, `Not run: ${answer.detail}`, "unreadable"), head: undefined };
   if (answer.status !== 200) {
     return { check: logAnswered(id, answer.status, answer.body), head: undefined };
   }
@@ -247,8 +254,8 @@ async function inLogCheck(receipt: unknown, log: LogInputs | undefined, head: Tr
   if (sth.treeSize === 0) return result(id, "failed", "The log is empty, so it does not hold this receipt. Check the log address.");
   const leaf = await leafHash(receipt.canonical);
   const answer = await log.client.inclusion(leaf, sth.treeSize);
-  if (answer.kind === "network") return result(id, "not-run", answer.detail, true);
-  if (answer.kind === "unreadable") return result(id, "not-run", `Not run: ${answer.detail}`, false, true);
+  if (answer.kind === "network") return retryable(id, answer.detail, "network");
+  if (answer.kind === "unreadable") return retryable(id, `Not run: ${answer.detail}`, "unreadable");
   if (answer.status === 404) {
     return result(id, "failed", "This log holds no entry for this receipt. Check the log address; if the receipt was submitted in the last few seconds, try again.");
   }
@@ -273,8 +280,8 @@ async function witnessesCheck(log: LogInputs | undefined, head: TreeHeadCheck | 
   if (log.witnessKeys.length === 0) return result(id, "not-run", "Not run: give one or more witness public keys to check cosignatures.");
   if (head?.status !== "passed") return result(id, "not-run", "Not run: the tree head was not checked, so there is no tree head to look for cosignatures on.");
   const answer = await log.client.cosignatures(head.sth.treeSize);
-  if (answer.kind === "network") return result(id, "not-run", answer.detail, true);
-  if (answer.kind === "unreadable") return result(id, "not-run", `Not run: ${answer.detail}`, false, true);
+  if (answer.kind === "network") return retryable(id, answer.detail, "network");
+  if (answer.kind === "unreadable") return retryable(id, `Not run: ${answer.detail}`, "unreadable");
   if (answer.status !== 200) {
     return logAnswered(id, answer.status, answer.body);
   }

@@ -25,8 +25,6 @@ const STATUS_LABEL: Record<CheckResult["status"], string> = { passed: "Passed", 
 const RECEIPT_CHECKS: readonly CheckId[] = ["format", "signature", "content-hash", "repeated-fields"];
 /** Checks 5 to 7: what the log says. */
 const LOG_CHECKS: readonly CheckId[] = ["tree-head", "in-log", "witnesses"];
-/** The log checks that must run for the log to count as checked; witnesses are optional. */
-const LOG_REQUIRED: readonly CheckId[] = ["tree-head", "in-log"];
 
 /** The id prefix of problem links, which a field's aria-describedby names. */
 const PROBLEM_ID = "problem-";
@@ -174,16 +172,25 @@ function renderCheck(doc: Document, c: CheckResult): HTMLLIElement {
 }
 
 /**
+ * The log checks the visitor asked for, which must run for the log to count
+ * as checked: none without a log address; the tree head and the proof with
+ * one; and the witnesses too when witness keys were given.
+ */
+function askedOfLog(inputs: Inputs): readonly CheckId[] {
+  if (inputs.log === undefined) return [];
+  return inputs.log.witnessKeys.length > 0 ? LOG_CHECKS : ["tree-head", "in-log"];
+}
+
+/**
  * What to say beside the verdict of a receipt that is valid on its own, so
  * the verdict never hides the log: the first of checks 5 to 7 that failed,
- * or, when a log was given, the tree head or the proof not run.
+ * or else the first log check the visitor asked for that was not run.
  */
-function logNote(report: ReceiptReport, logGiven: boolean): string {
+function logNote(report: ReceiptReport, asked: readonly CheckId[]): string {
   if (!report.valid) return "";
   const failed = report.checks.find((c) => LOG_CHECKS.includes(c.id) && c.status === "failed");
   if (failed !== undefined) return ` But the log check failed: ${detailOf(failed)}`;
-  if (!logGiven) return "";
-  const notRun = report.checks.find((c) => LOG_REQUIRED.includes(c.id) && c.status === "not-run");
+  const notRun = report.checks.find((c) => asked.includes(c.id) && c.status === "not-run");
   if (notRun === undefined) return "";
   const why = detailOf(notRun);
   return ` But the log was not checked: ${why.startsWith("Not run: ") ? why.slice("Not run: ".length) : why}`;
@@ -191,19 +198,16 @@ function logNote(report: ReceiptReport, logGiven: boolean): string {
 
 /** Why asking the log again may help: it was not reached or was busy, or its answer could not be read. */
 function retryCause(c: CheckResult): "reach" | "unreadable" | undefined {
-  if (!c.retry) return undefined;
-  // checks.ts words a 5xx answer "Not run: the log is busy or failing"; any
-  // other retry without a network error is an answer that could not be read.
-  return c.network || c.detail.startsWith("Not run: the log is busy") ? "reach" : "unreadable";
+  return c.cause === "network" || c.cause === "busy" ? "reach" : c.cause;
 }
 
-function renderReport(doc: Document, report: ReceiptReport, index: number, total: number, logGiven: boolean): HTMLElement {
+function renderReport(doc: Document, report: ReceiptReport, index: number, total: number, asked: readonly CheckId[]): HTMLElement {
   const article = el(doc, "article", `report report--${report.valid ? "valid" : "invalid"}`);
   const label = total === 1 ? "The receipt" : `Receipt ${String(index + 1)} of ${String(total)}`;
   const own = report.checks.filter((c) => RECEIPT_CHECKS.includes(c.id));
   const reason = own.find((c) => c.status === "failed") ?? own.find((c) => c.status !== "passed");
   const verdict = report.valid
-    ? `${label} is valid: signed by ${report.key ?? "the issuer key"}, and unchanged since.${logNote(report, logGiven)}`
+    ? `${label} is valid: signed by ${report.key ?? "the issuer key"}, and unchanged since.${logNote(report, asked)}`
     : `${label} is not valid. ${reason === undefined ? "A check did not pass." : detailOf(reason)}`;
   article.append(el(doc, "h3", undefined, verdict));
   const list = el(doc, "ol", "checks");
@@ -263,14 +267,14 @@ async function run(doc: Document): Promise<void> {
       renderProblems(doc, form.problems);
       return;
     }
-    const logGiven = form.inputs.log !== undefined;
+    const asked = askedOfLog(form.inputs);
     const reports = await checkReceipts(form.receipts, form.inputs);
-    list.replaceChildren(...reports.map((r, i) => renderReport(doc, r, i, reports.length, logGiven)));
+    list.replaceChildren(...reports.map((r, i) => renderReport(doc, r, i, reports.length, asked)));
     const causes = new Set(reports.flatMap((r) => r.checks.map(retryCause)));
     retryButton.hidden = !(causes.has("reach") || causes.has("unreadable"));
     results.hidden = false;
     const validCount = reports.filter((r) => r.valid).length;
-    const note = reports.map((r) => logNote(r, logGiven)).find((n) => n !== "") ?? "";
+    const note = reports.map((r) => logNote(r, asked)).find((n) => n !== "") ?? "";
     status.textContent =
       `Checked ${String(reports.length)} ${reports.length === 1 ? "receipt" : "receipts"}: ${String(validCount)} valid.${note}` +
       (causes.has("reach") ? " The log could not be reached, or was busy; you can try it again." : "") +
@@ -329,13 +333,13 @@ export async function start(doc: Document): Promise<void> {
   }
   wireFiles(doc);
   const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
+  // aria-disabled and the guard, not the disabled property, so a button that
+  // has focus keeps it while a run is in progress.
   let running = false;
   const busy = (on: boolean): void => {
     running = on;
-    if (button === null) return;
-    button.disabled = on;
-    if (on) button.setAttribute("aria-disabled", "true");
-    else button.removeAttribute("aria-disabled");
+    if (on) button?.setAttribute("aria-disabled", "true");
+    else button?.removeAttribute("aria-disabled");
   };
   const go = (): void => {
     if (running) return;
