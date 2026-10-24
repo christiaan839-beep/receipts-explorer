@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+test-results/
+playwright-report/
+__pycache__/
+.DS_Store
+.ruff_cache/
+blob-report/
+coverage/
+.venv/
+npm-debug.log*
+.env
+.env.*
+*.key
+.claude/settings.local.json
+src/lint-probe-*.ts

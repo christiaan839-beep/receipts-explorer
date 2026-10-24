@@ -1,0 +1,15 @@
+# Settings for ruff, the only Python tool CI installs (hash-pinned in
+# .github/tools/python-ci). The site itself needs nothing beyond the
+# standard library of Python 3.9 or later; CI runs Python 3.12.
+[tool.ruff]
+required-version = "==0.17.0"
+line-length = 140
+target-version = "py39"
+extend-exclude = ["third_party", "node_modules", "dist", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "A", "S", "SIM", "RUF"]
+ignore = ["S101", "S603"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
