@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import unittest
 from html.parser import HTMLParser
+from unittest import mock
 
-from app.layout import CSP
-from app.pages import all_routes, render_not_found, render_route
+from app.layout import CSP, render_page
+from app.ontology import Term
+from app.pages import all_routes, page_term, render_not_found, render_route
 
 ASSETS = {"styles": "sha384-styles", "script": "sha384-script"}
 BASE = "/receipts-explorer"
@@ -49,6 +51,20 @@ def parse(html: str) -> Page:
 PAGES = {route: render_route(route, ASSETS) or "" for route in all_routes()}
 PAGES["/404.html"] = render_not_found(ASSETS)
 
+# A term whose name and definition hold markup: the name is text, the
+# definition is HTML as app/ontology.py renders it, with its text escaped.
+EVIL = Term(
+    name='<script>"&amp; x',
+    slug="evil",
+    definition="A &lt;script&gt;&quot;&amp; definition.",
+    scitt="",
+    group="protocol",
+)
+EVIL_PAGE = render_page(*page_term(EVIL), ASSETS)
+PAGES["/terms/evil/"] = EVIL_PAGE
+
+NOINDEX = {"/404.html"}
+
 
 class PagesTest(unittest.TestCase):
     def test_every_page_has_the_shell(self) -> None:
@@ -81,13 +97,118 @@ class PagesTest(unittest.TestCase):
         seen: dict[str, set[str]] = {"title": set(), "description": set(), "canonical": set()}
         for route, html in PAGES.items():
             p = parse(html)
-            title = "".join(p.data["title"])
+            title = p.data["title"][0]  # the head's title, not the figure's SVG title
             description = p.meta("name", "description")
-            canonical = next(a["href"] for a in p.all("link") if a.get("rel") == "canonical")
+            canonicals = [a["href"] for a in p.all("link") if a.get("rel") == "canonical"]
             self.assertLessEqual(len(description), 160, route)
-            for key, value in (("title", title), ("description", description), ("canonical", canonical)):
+            values = [("title", title), ("description", description)]
+            if route in NOINDEX:
+                self.assertEqual(canonicals, [], f"{route}: a page not indexed has no canonical")
+            else:
+                self.assertEqual(len(canonicals), 1, route)
+                values.append(("canonical", canonicals[0]))
+            for key, value in values:
                 self.assertNotIn(value, seen[key], f"{route}: repeated {key}")
                 seen[key].add(value)
+
+    def test_open_graph_and_robots(self) -> None:
+        for route, html in PAGES.items():
+            with self.subTest(route=route):
+                p = parse(html)
+                title = p.data["title"][0]  # the head's title, not the figure's SVG title
+                description = p.meta("name", "description")
+                self.assertEqual(p.meta("property", "og:title"), title)
+                self.assertEqual(p.meta("property", "og:description"), description)
+                self.assertEqual(p.meta("name", "twitter:title"), title)
+                og_urls = [a["content"] for a in p.all("meta") if a.get("property") == "og:url"]
+                if route in NOINDEX:
+                    self.assertEqual(p.meta("name", "robots"), "noindex")
+                    self.assertEqual(og_urls, [])
+                else:
+                    self.assertEqual(p.meta("name", "robots"), "index, follow")
+                    canonical = next(a["href"] for a in p.all("link") if a.get("rel") == "canonical")
+                    self.assertEqual(og_urls, [canonical])
+                    self.assertTrue(canonical.startswith("https://christiaan839-beep.github.io/receipts-explorer/"))
+
+    def test_the_stylesheet_carries_its_hash(self) -> None:
+        for route, html in PAGES.items():
+            with self.subTest(route=route):
+                sheets = [a for a in parse(html).all("link") if a.get("rel") == "stylesheet"]
+                self.assertEqual(sheets, [{"rel": "stylesheet", "href": f"{BASE}/static/styles.css", "integrity": "sha384-styles"}])
+
+    def test_the_csp_is_exactly_this(self) -> None:
+        directives = dict(d.split(" ", 1) for d in CSP.split("; "))
+        self.assertEqual(
+            directives,
+            {
+                "default-src": "'none'",
+                "script-src": "'self'",
+                "style-src": "'self'",
+                "img-src": "'self' data:",
+                "connect-src": "https:",
+                "base-uri": "'none'",
+                "form-action": "'none'",
+                "require-trusted-types-for": "'script'",
+            },
+        )
+
+    def test_ids_are_unique_and_every_reference_exists(self) -> None:
+        for route, html in PAGES.items():
+            with self.subTest(route=route):
+                p = parse(html)
+                ids = [a["id"] for _, a in p.tags if "id" in a]
+                self.assertEqual(len(ids), len(set(ids)), f"repeated ids: {sorted(i for i in ids if ids.count(i) > 1)}")
+                for _, attrs in p.tags:
+                    for key in ("aria-describedby", "aria-labelledby", "for"):
+                        for ref in attrs.get(key, "").split():
+                            self.assertIn(ref, ids, f"{key}={ref}")
+
+    def test_markup_in_a_term_is_text(self) -> None:
+        p = parse(EVIL_PAGE)
+        self.assertEqual([a for a in p.all("script") if a.get("type") != "application/ld+json"], [])
+        self.assertEqual("".join(p.data["h1"]), '<script>"&amp; x')
+        self.assertEqual(p.data["title"][0], '<script>"&amp; x: definition | Receipts explorer')
+        self.assertEqual(p.meta("name", "description"), 'A <script>"& definition.')
+        self.assertEqual("".join(p.data["p"]).count('A <script>"& definition.'), 1)
+        self.assertNotIn('<script>"', EVIL_PAGE)
+        data = json.loads("".join(p.data["script"]))
+        self.assertEqual(data["@graph"][1]["name"], '<script>"&amp; x')
+        self.assertEqual(data["@graph"][1]["description"], 'A <script>"& definition.')
+
+    def test_the_nav_labels_and_site_name_are_text(self) -> None:
+        nav = [{"label": "<b>&amp;", "path": "/terms/", "key": "terms"}]
+        with mock.patch("app.layout.NAV", nav), mock.patch.dict("app.layout.SITE", {"name": "<i>&amp;"}):
+            p = parse(render_route("/terms/", ASSETS) or "")
+        self.assertEqual([t for t, _ in p.tags if t in ("b", "i")], [])
+        links = [a for a in p.all("a") if a.get("class") == "brand" or "aria-current" in a]
+        self.assertEqual(len(links), 2)
+        self.assertIn("<i>&amp;", p.data["a"])
+        self.assertIn("<b>&amp;", p.data["a"])
+
+    def test_json_ld_has_no_markup(self) -> None:
+        for route, html in PAGES.items():
+            with self.subTest(route=route):
+                self.assertNotIn("<", "".join(parse(html).data["script"]))
+
+    def test_the_nav_marks_the_page_and_its_section(self) -> None:
+        def current(route: str) -> list[tuple[str, str]]:
+            return [(a["href"], a["aria-current"]) for a in parse(PAGES[route]).all("a") if "aria-current" in a]
+
+        self.assertEqual(current("/"), [(f"{BASE}/", "page")])
+        self.assertEqual(current("/terms/"), [(f"{BASE}/terms/", "page")])
+        self.assertEqual(current("/terms/receipt/"), [(f"{BASE}/terms/", "true")])
+        self.assertEqual(current("/404.html"), [])
+        navs = [a.get("aria-label") for a in parse(PAGES["/terms/receipt/"]).all("nav")]
+        self.assertEqual(navs, ["Main", "Breadcrumb"])
+
+    def test_the_check_page_says_it_needs_javascript_until_the_script_starts(self) -> None:
+        p = parse(PAGES["/"])
+        by_id = {a["id"]: a for _, a in p.tags if "id" in a}
+        self.assertNotIn("hidden", by_id["needs-js"])
+        self.assertIn("hidden", by_id["framed"])
+        self.assertIn("hidden", by_id["check-form"])
+        self.assertEqual(p.all("noscript"), [])
+        self.assertIn("Checking needs JavaScript", PAGES["/"])
 
     def test_json_ld_parses(self) -> None:
         for route, html in PAGES.items():

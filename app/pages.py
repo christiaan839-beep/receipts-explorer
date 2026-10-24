@@ -10,7 +10,7 @@ import html
 import re
 
 from .content import CHAIN, CHECKS, PRIVACY, SITE, VR_REF
-from .layout import esc, render_page, url
+from .layout import absolute, esc, render_page, url
 from .ontology import AGENT_INTRO, BY_SLUG, NAME_NOTE, RELATIONS, TERMS, Term
 
 
@@ -64,14 +64,17 @@ def page_check() -> tuple[dict, str]:
             "operatingSystem": "Any, in a current web browser",
             "description": SITE["description"],
             "isAccessibleForFree": True,
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
         },
     }
     privacy = "".join(f"<li>{esc(p)}</li>" for p in PRIVACY)
     body = f"""<h1>Check a receipt</h1>
 <p class="lede">A receipt is an issuer's signed record of something an AI agent did. Paste one with the issuer's public key,
-and this page checks, in your browser, that the issuer signed exactly this text. Give a receipts-log address too,
-and it checks that the receipt is in the log, and that witnesses saw the same log.</p>
-<noscript><p class="notice">Checking needs JavaScript, which is off. The rest of this page explains the checks.</p></noscript>
+and this page checks, in your browser, that the issuer signed exactly this text. Give a receipts-log address and the
+log's public key too, and it checks that the receipt is in the log; with witness keys, that witnesses saw the same log.</p>
+<p id="needs-js" class="notice">Checking needs JavaScript, which is off or did not load. The rest of this page explains the checks.</p>
+<p id="framed" class="notice" hidden>This page checks receipts only at its own address, not inside another page.
+<a href="{url("/")}" target="_top">Open it on its own</a>.</p>
 <p id="no-ed25519" class="notice" hidden>This browser cannot check Ed25519 signatures, so no checks can run here.
 Use a current version of Firefox, Chrome, Edge or Safari.</p>
 <div id="problems" class="problems" tabindex="-1" role="alert" hidden></div>
@@ -99,7 +102,7 @@ Use a current version of Firefox, Chrome, Edge or Safari.</p>
 <section aria-labelledby="checks-heading">
   <h2 id="checks-heading">The seven checks</h2>
   <p>Each check is passed, failed or not run. A check that cannot run, because a key or the log address is missing or the
-  log cannot be reached, is shown as not run, never as passed.</p>
+  log cannot be reached, is shown as not run, or as a network error, never as passed.</p>
   {check_list()}
 </section>
 <section aria-labelledby="privacy-heading">
@@ -162,9 +165,14 @@ def page_terms() -> tuple[dict, str]:
     meta = {
         "path": "/terms/",
         "title": "Terms: the ontology of verifiable receipts",
-        "description": "Every term verifiable receipts uses, defined once, with its equivalent in SCITT (RFC 9943).",
+        "description": "Every term verifiable receipts uses, defined once, with its SCITT (RFC 9943) equivalent where there is one.",
         "active": "terms",
-        "schema": {"@type": "DefinedTermSet", "name": "Verifiable receipts ontology", "inLanguage": SITE["locale"]},
+        "schema": {
+            "@type": "DefinedTermSet",
+            "@id": absolute("/terms/"),
+            "name": "Verifiable receipts ontology",
+            "inLanguage": SITE["locale"],
+        },
     }
     protocol = "".join(
         f"<li>{term_link(t.slug)}<span class='term-scitt'>SCITT: {t.scitt}</span></li>" for t in TERMS if t.group == "protocol"
@@ -194,16 +202,22 @@ def page_term(term: Term) -> tuple[dict, str]:
             "@type": "DefinedTerm",
             "name": term.name,
             "description": plain(term.definition, 1000),
-            "inDefinedTermSet": {"@type": "DefinedTermSet", "name": "Verifiable receipts ontology"},
+            "inDefinedTermSet": {
+                "@type": "DefinedTermSet",
+                "@id": absolute("/terms/"),
+                "url": absolute("/terms/"),
+                "name": "Verifiable receipts ontology",
+            },
         },
     }
     scitt = f"<h2>In SCITT (RFC 9943)</h2><p>{term.scitt}</p>" if term.scitt else ""
     checks = [c for c in CHECKS if c["term"] == term.slug]
     used = ""
     if checks:
-        names = ", ".join(esc(c["name"]) for c in checks)
-        used = f'<h2>Checked on this site</h2><p>The {names} check relies on this term. <a href="{url("/")}">Check a receipt</a>.</p>'
-    body = f"""<p class="breadcrumb"><a href="{url("/terms/")}">Terms</a></p>
+        names = " and ".join(f"“{esc(c['name'])}”" for c in checks)
+        noun = "check" if len(checks) == 1 else "checks"
+        used = f'<h2>Checked on this site</h2><p>This term is used by the {names} {noun}. <a href="{url("/")}">Check a receipt</a>.</p>'
+    body = f"""<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{url("/terms/")}">Terms</a></nav>
 <h1>{esc(term.name)}</h1>
 <p class="definition">{term.definition}</p>
 {scitt}

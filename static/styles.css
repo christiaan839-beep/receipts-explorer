@@ -57,7 +57,8 @@ h3 { font-size: 1.1rem; margin: 1rem 0 0.25rem; }
 .field { display: grid; gap: 0.3rem; }
 label { font-weight: 600; }
 .hint { margin: 0; color: var(--muted); font-size: 0.95rem; }
-textarea, input[type="url"] { width: 100%; font: 0.9rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--fg); background: var(--bg); border: 1px solid var(--muted); border-radius: 4px; padding: 0.5rem; }
+/* 1rem, at least 16px, so that iOS does not zoom in on a field it focuses. */
+textarea, input[type="url"] { width: 100%; font: 1rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--fg); background: var(--bg); border: 1px solid var(--muted); border-radius: 4px; padding: 0.5rem; }
 textarea[aria-invalid="true"], input[aria-invalid="true"] { border: 2px solid var(--fail); }
 .file-label { font-weight: 400; font-size: 0.95rem; }
 input[type="file"] { max-width: 100%; }

@@ -2,8 +2,9 @@
 
 Every page gets: lang="en-ZA"; a Content Security Policy as a meta tag
 (GitHub Pages sends no headers) that allows scripts and styles from the
-site only, no inline code, and connections only over https; no referrer;
-a unique title, description and canonical URL; Open Graph and Twitter
+site only, no inline code, no HTML from strings (Trusted Types), and
+connections only over https; no referrer; a unique title and description,
+and, on a page to be indexed, a canonical URL; Open Graph and Twitter
 metadata; JSON-LD; a skip link and landmarks. The stylesheet and the
 script carry Subresource Integrity hashes.
 """
@@ -16,7 +17,8 @@ import json
 from .content import NAV, SITE
 
 CSP = (
-    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https:; base-uri 'none'; form-action 'none'"
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https:; base-uri 'none'; "
+    "form-action 'none'; require-trusted-types-for 'script'"
 )
 
 
@@ -46,8 +48,10 @@ def _json_ld(meta: dict) -> str:
         {**meta["schema"], "url": absolute(meta["path"]), "isPartOf": {"@id": absolute("/#website")}},
     ]
     text = json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False, sort_keys=True)
-    # A JSON-LD block is data, not code; "</" is escaped so no text can end the element early.
-    return text.replace("</", "<\\/")
+    # A JSON-LD block is data, not code. Every "<" is written as <, which
+    # JSON reads as the same character, so no text can end the element early
+    # or open a comment in it.
+    return text.replace("<", "\\u003c")
 
 
 def _head(meta: dict, assets: dict[str, str]) -> str:
@@ -57,6 +61,9 @@ def _head(meta: dict, assets: dict[str, str]) -> str:
     if meta.get("script"):
         script = f'\n  <script type="module" src="{url("/static/check.js")}" integrity="{assets["script"]}"></script>'
     robots = "noindex" if meta.get("noindex") else "index, follow"
+    # A page not to be indexed, such as the 404 page, has no address of its own to name.
+    link = "" if meta.get("noindex") else f'\n  <link rel="canonical" href="{canonical}">'
+    og_url = "" if meta.get("noindex") else f'\n  <meta property="og:url" content="{canonical}">'
     return f"""  <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="{CSP}">
   <meta name="referrer" content="no-referrer">
@@ -64,13 +71,11 @@ def _head(meta: dict, assets: dict[str, str]) -> str:
   <meta name="color-scheme" content="light dark">
   <title>{esc(title)}</title>
   <meta name="description" content="{esc(meta["description"])}">
-  <meta name="robots" content="{robots}">
-  <link rel="canonical" href="{canonical}">
+  <meta name="robots" content="{robots}">{link}
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{esc(SITE["name"])}">
   <meta property="og:title" content="{esc(title)}">
-  <meta property="og:description" content="{esc(meta["description"])}">
-  <meta property="og:url" content="{canonical}">
+  <meta property="og:description" content="{esc(meta["description"])}">{og_url}
   <meta property="og:locale" content="{SITE["og_locale"]}">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="{esc(title)}">
@@ -80,15 +85,18 @@ def _head(meta: dict, assets: dict[str, str]) -> str:
   <script type="application/ld+json">{_json_ld(meta)}</script>"""
 
 
-def _header(active: str | None) -> str:
+def _header(meta: dict) -> str:
     items = []
     for n in NAV:
-        current = ' aria-current="page"' if n["key"] == active else ""
-        items.append(f'<li><a href="{url(n["path"])}"{current}>{n["label"]}</a></li>')
+        # "page" on the section's own page; "true" on a page within it, such as a term.
+        current = ""
+        if n["key"] == meta.get("active"):
+            current = ' aria-current="page"' if n["path"] == meta["path"] else ' aria-current="true"'
+        items.append(f'<li><a href="{url(n["path"])}"{current}>{esc(n["label"])}</a></li>')
     return f"""<a class="skip-link" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="container header-inner">
-    <a class="brand" href="{url("/")}">{SITE["name"]}</a>
+    <a class="brand" href="{url("/")}">{esc(SITE["name"])}</a>
     <nav aria-label="Main"><ul class="nav">{"".join(items)}</ul></nav>
   </div>
 </header>"""
@@ -97,8 +105,8 @@ def _header(active: str | None) -> str:
 def _footer() -> str:
     return f"""<footer class="site-footer">
   <div class="container">
-    <p>Open source, Apache-2.0: <a href="{SITE["repo"]}">receipts-explorer on GitHub</a>.
-    The checks are those of <a href="{SITE["vr_repo"]}">verifiable-receipts</a>.</p>
+    <p>Open source, Apache-2.0: <a href="{esc(SITE["repo"])}">receipts-explorer on GitHub</a>.
+    The checks are those of <a href="{esc(SITE["vr_repo"])}">verifiable-receipts</a>.</p>
     <p>{esc(SITE["author"])}.</p>
   </div>
 </footer>"""
@@ -112,7 +120,7 @@ def render_page(meta: dict, body: str, assets: dict[str, str]) -> str:
 {_head(meta, assets)}
 </head>
 <body>
-{_header(meta.get("active"))}
+{_header(meta)}
 <main id="main" class="container">
 {body}
 </main>

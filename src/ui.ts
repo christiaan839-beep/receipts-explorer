@@ -325,7 +325,24 @@ function wireFiles(doc: Document): void {
   }
 }
 
+/**
+ * Whether the page is inside another page's frame, or has no window. GitHub
+ * Pages sends no headers, so frame-ancestors cannot be set; the page refuses
+ * to run framed instead, so another site cannot dress up its verdicts.
+ */
+function framed(doc: Document): boolean {
+  const view = doc.defaultView;
+  return view === null || view.top !== view.self;
+}
+
 export async function start(doc: Document): Promise<void> {
+  // The page says checking needs JavaScript until here, so a script that is
+  // blocked, or refused for a changed hash, still leaves the page explained.
+  byId(doc, "needs-js").hidden = true;
+  if (framed(doc)) {
+    byId(doc, "framed").hidden = false;
+    return;
+  }
   const form = byId(doc, "check-form");
   if (!(await hasEd25519())) {
     byId(doc, "no-ed25519").hidden = false;
