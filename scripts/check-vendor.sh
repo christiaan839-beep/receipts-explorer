@@ -68,4 +68,10 @@ for f in tree-head.json cosignature.json; do
   cmp "$upstream/schemas/examples/$f" "test/fixtures/schemas/$f" || fail "test/fixtures/schemas/$f" "differs from VR_REF"
 done
 
+# The ports: exactly these files, each naming VR_REF.
+printf '%s\n' receipt.ts transparency.ts | exactly src/vendor/verifiable-receipts
+for f in receipt.ts transparency.ts; do
+  grep -q "third_party/verifiable-receipts/VR_REF" "src/vendor/verifiable-receipts/$f" ||
+    fail "src/vendor/verifiable-receipts/$f" "does not name third_party/verifiable-receipts/VR_REF"
+done
 echo "every vendored file matches verifiable-receipts at $ref"
