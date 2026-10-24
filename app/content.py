@@ -16,8 +16,8 @@ SITE = {
     "locale": "en-ZA",
     "og_locale": "en_ZA",
     "description": (
-        "Check a verifiable receipt in your browser: its signature, its content, and its place in a "
-        "transparency log. Nothing you paste leaves your device."
+        "Check a verifiable receipt's signature, hash and log proof in your browser. "
+        "Your receipt is not uploaded; given a log address, only its hash goes to that log."
     ),
     "repo": "https://github.com/christiaan839-beep/receipts-explorer",
     "vr_repo": "https://github.com/christiaan839-beep/verifiable-receipts",
@@ -36,12 +36,25 @@ CHECKS = json.loads((ROOT / "content" / "checks.json").read_text(encoding="utf-8
 # The chain of trust, from issuer to witness, for the How it works page.
 CHAIN = [
     ("issuer", "Issuer", "A business, or the host acting for it, signs a receipt for each action with its issuer key."),
-    ("receipt", "Receipt", "The exact text that was signed, its hash and its signature. Change one character and it fails."),
-    ("leaf", "Leaf", "The receipt's hash, appended to a transparency log, which can only grow."),
+    (
+        "receipt",
+        "Receipt",
+        "The exact text that was signed, its hash and its signature. Change one character of the signed text and it fails.",
+    ),
+    (
+        "leaf",
+        "Leaf",
+        "A hash of the receipt's signed text, appended to a transparency log, which is meant only to grow; witnesses check that it does.",
+    ),
     ("tree-head", "Tree head", "The log signs its size and root from time to time, committing to every entry so far."),
     ("inclusion-proof", "Inclusion proof", "A few hashes that link one receipt to the root in a signed tree head."),
-    ("witness", "Witness", "Independent parties cosign a tree head only if it extends the last one they saw."),
-    ("verifier", "Verifier", "This page, or a library: it checks each link itself, and trusts none of them on its own."),
+    ("witness", "Witness", "Independent parties cosign a tree head only if it extends the last one they cosigned."),
+    (
+        "verifier",
+        "Verifier",
+        "This page: it checks each link itself, and trusts none of them on its own. "
+        "The libraries check receipts and inclusion proofs, not tree-head signatures or cosignatures.",
+    ),
 ]
 
 PRIVACY = [
