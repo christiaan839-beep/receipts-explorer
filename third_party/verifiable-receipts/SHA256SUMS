@@ -1,0 +1,3 @@
+74097a7201ac3ae2d193ae8cc71cca09e0e5571faa73b1e17cbfcb131fd40a3c  packages/verifiable-receipts/conformance/verify-v2.mjs
+8915d41a4df646edad2a581bf211bd5d7c785844819240be7574e57e0cd59ea5  packages/verifiable-receipts/src/hash.ts
+04b4921ab45988fb54b269f8c78139bdc67762d92c85979cad8952c9ba243f0f  packages/verifiable-receipts/src/transparency.ts
