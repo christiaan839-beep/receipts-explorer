@@ -1,4 +1,4 @@
-"""serve.py: serves the site under /receipts-explorer/, and nothing outside it, to this machine only."""
+"""serve.py: serves the site at the root, and nothing outside it, to this machine only."""
 
 from __future__ import annotations
 
@@ -19,39 +19,38 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Paths that reach files outside what the site publishes, in the spellings that once got through.
 ESCAPES = (
-    "/receipts-explorer/static/%2e%2e/.env",
-    "/receipts-explorer/static%2f..%2f.env",
-    "/receipts-explorer/static/..%2f.env",
-    "/receipts-explorer/static/%2e%2e/.git/config/",
-    "/receipts-explorer/static/%2e%2e/.git/config",
-    "/receipts-explorer/static/%2e%2e/app/content.py",
-    "/receipts-explorer/static/../app/content.py",
-    "/receipts-explorer/static/%2e%2e/%2e%2e/.env",
-    "/receipts-explorer/%2e%2e/build.py",
-    "/receipts-explorer/../serve.py",
-    "/receipts-explorer/%2e%2e/serve.py",
-    "/receipts-explorer/static/%2e%2e/package.json",
-    "/receipts-explorer/static/%2e%2e/build/check.js",
-    "/receipts-explorer//etc/hosts",
-    "/receipts-explorer/static//etc/hosts",
-    "/receipts-explorer/static/%2e%2e/%2e%2e/%2e%2e/etc/hosts",
-    "/receipts-explorer/static/.%2e/LICENSE",
-    "/receipts-explorer/static/.hidden",
+    "/static/%2e%2e/.env",
+    "/static%2f..%2f.env",
+    "/static/..%2f.env",
+    "/static/%2e%2e/.git/config/",
+    "/static/%2e%2e/.git/config",
+    "/static/%2e%2e/app/content.py",
+    "/static/../app/content.py",
+    "/static/%2e%2e/%2e%2e/.env",
+    "/%2e%2e/build.py",
+    "/../serve.py",
+    "/%2e%2e/serve.py",
+    "/static/%2e%2e/package.json",
+    "/static/%2e%2e/build/check.js",
+    "//etc/hosts",
+    "/static//etc/hosts",
+    "/static/%2e%2e/%2e%2e/%2e%2e/etc/hosts",
+    "/static/.%2e/LICENSE",
+    "/static/.hidden",
 )
 
 # Paths that must never redirect off this server.
 STRANGE = (
     "//evil.example",
     "//evil.example/",
+    "//evil",
     "/%2F%2Fevil.example",
     "/%2F%2Fevil.example/",
-    "/receipts-explorer/%2F%2Fevil.example",
-    "/receipts-explorer//evil.example",
-    "/receipts-explorer/x%0d%0aSet-Cookie:%20a=b",
-    "/receipts-explorer/x%0d%0aLocation:%20https://evil.example/",
-    "/receipts-explorer/terms%0d%0aX-Injected:%201",
-    "/receipts-explorer/terms%00",
-    "/receipts-explorer/%0a",
+    "/x%0d%0aSet-Cookie:%20a=b",
+    "/x%0d%0aLocation:%20https://evil.example/",
+    "/terms%0d%0aX-Injected:%201",
+    "/terms%00",
+    "/%0a",
 )
 
 
@@ -101,7 +100,7 @@ class ServeTests(unittest.TestCase):
         self.assertIn(status, (301, 404), path)
         location = headers.get("Location")
         if location is not None:
-            self.assertTrue(location.startswith("/receipts-explorer/"), (path, location))
+            self.assertTrue(location.startswith("/"), (path, location))
             self.assertFalse(location.startswith("//"), (path, location))
         for name in headers:
             self.assertNotIn(name.lower(), ("set-cookie", "x-injected"), path)
@@ -121,20 +120,26 @@ class ServeTests(unittest.TestCase):
 
     def test_the_site_redirects_only_within_itself(self) -> None:
         for path, location in (
-            ("/", "/receipts-explorer/"),
-            ("/receipts-explorer", "/receipts-explorer/"),
-            ("/receipts-explorer/terms", "/receipts-explorer/terms/"),
+            ("/terms", "/terms/"),
+            ("/how-it-works", "/how-it-works/"),
+            ("/terms/receipt", "/terms/receipt/"),
         ):
             status, headers, _ = self.server.get(path)
             self.assertEqual((status, headers.get("Location")), (301, location), path)
 
+    def test_the_root_is_the_check_page_not_a_redirect(self) -> None:
+        status, headers, body = self.server.get("/")
+        self.assertEqual(status, 200)
+        self.assertIsNone(headers.get("Location"))
+        self.assertIn(b"<h1>Check a receipt</h1>", body)
+
     def test_a_missing_path_is_not_found_rather_than_redirected(self) -> None:
         for path in (
-            "/receipts-explorer/nope",
-            "/receipts-explorer/terms/nope",
-            "/receipts-explorer/nope/",
+            "/nope",
+            "/terms/nope",
+            "/nope/",
             "/elsewhere/",
-            "/receipts-explorer/nope.zz",
+            "/nope.zz",
         ):
             status, headers, _ = self.server.get(path)
             self.assertEqual(status, 404, path)
@@ -144,7 +149,7 @@ class ServeTests(unittest.TestCase):
     def test_only_this_machine_s_names_are_answered(self) -> None:
         port = self.server.port
         for host in (f"127.0.0.1:{port}", f"localhost:{port}"):
-            status, _, _ = self.server.get("/receipts-explorer/", host=host)
+            status, _, _ = self.server.get("/", host=host)
             self.assertEqual(status, 200, host)
         for host in (
             "attacker.example",
@@ -155,7 +160,7 @@ class ServeTests(unittest.TestCase):
             f"localhost.attacker.example:{port}",
             "",
         ):
-            for path in ("/receipts-explorer/", "/receipts-explorer/static/styles.css", "/receipts-explorer/static/%2e%2e/.env", "/"):
+            for path in ("/", "/static/styles.css", "/static/%2e%2e/.env", "/terms/"):
                 status, headers, body = self.server.get(path, host=host)
                 self.assertEqual(status, 421, (host, path))
                 self.assertIsNone(headers.get("Location"))
@@ -163,34 +168,32 @@ class ServeTests(unittest.TestCase):
 
     def test_each_file_has_its_type_and_no_sniffing(self) -> None:
         for path, ctype in (
-            ("/receipts-explorer/", "text/html; charset=utf-8"),
-            ("/receipts-explorer/index.html", "text/html; charset=utf-8"),
-            ("/receipts-explorer/terms/", "text/html; charset=utf-8"),
-            ("/receipts-explorer/terms/index.html", "text/html; charset=utf-8"),
-            ("/receipts-explorer/static/styles.css", "text/css; charset=utf-8"),
-            ("/receipts-explorer/static/check.js", "text/javascript; charset=utf-8"),
-            ("/receipts-explorer/static/img/favicon.svg", "image/svg+xml"),
-            ("/receipts-explorer/robots.txt", "text/plain; charset=utf-8"),
-            ("/receipts-explorer/sitemap.xml", "application/xml; charset=utf-8"),
+            ("/", "text/html; charset=utf-8"),
+            ("/index.html", "text/html; charset=utf-8"),
+            ("/terms/", "text/html; charset=utf-8"),
+            ("/terms/index.html", "text/html; charset=utf-8"),
+            ("/static/styles.css", "text/css; charset=utf-8"),
+            ("/static/check.js", "text/javascript; charset=utf-8"),
+            ("/static/img/favicon.svg", "image/svg+xml"),
+            ("/robots.txt", "text/plain; charset=utf-8"),
+            ("/sitemap.xml", "application/xml; charset=utf-8"),
         ):
             status, headers, body = self.server.get(path)
             self.assertEqual((status, headers["Content-Type"]), (200, ctype), path)
             self.assertEqual(headers["X-Content-Type-Options"], "nosniff", path)
             self.assertEqual(int(headers["Content-Length"]), len(body), path)
-        for path, host in (("/receipts-explorer/nope/", None), ("/receipts-explorer", None), ("/receipts-explorer/", "attacker.example")):
+        for path, host in (("/nope/", None), ("/terms", None), ("/", "attacker.example")):
             _, headers, _ = self.server.get(path, host=host)
             self.assertEqual(headers["X-Content-Type-Options"], "nosniff", path)
 
     def test_the_script_is_the_bundle(self) -> None:
-        _, _, body = self.server.get("/receipts-explorer/static/check.js")
+        _, _, body = self.server.get("/static/check.js")
         self.assertEqual(body, (ROOT / "build" / "check.js").read_bytes())
 
     def test_head_sends_headers_only(self) -> None:
-        _, _, body = self.server.get("/receipts-explorer/static/styles.css")
+        _, _, body = self.server.get("/static/styles.css")
         with socket.create_connection(("127.0.0.1", self.server.port), timeout=10) as sock:
-            sock.sendall(
-                f"HEAD /receipts-explorer/static/styles.css HTTP/1.0\r\nHost: 127.0.0.1:{self.server.port}\r\n\r\n".encode("ascii")
-            )
+            sock.sendall(f"HEAD /static/styles.css HTTP/1.0\r\nHost: 127.0.0.1:{self.server.port}\r\n\r\n".encode("ascii"))
             raw = b""
             while chunk := sock.recv(65536):
                 raw += chunk
@@ -231,12 +234,12 @@ class LiveServeTest(ServeTests):
 
     def test_static_files_come_from_static(self) -> None:
         for rel in ("styles.css", "img/favicon.svg", "only-here.txt"):
-            status, _, body = self.server.get("/receipts-explorer/static/" + rel)
+            status, _, body = self.server.get("/static/" + rel)
             self.assertEqual((status, body), (200, (self.static / rel).read_bytes()), rel)
 
     def test_hidden_files_and_links_out_of_static_are_not_served(self) -> None:
         for rel in (".hidden.txt", "link.txt", "%2e%2e/secret.txt", "..%2fsecret.txt"):
-            status, _, body = self.server.get("/receipts-explorer/static/" + rel)
+            status, _, body = self.server.get("/static/" + rel)
             self.assertEqual(status, 404, rel)
             self.assertNotIn(b"SECRET", body)
             self.assertNotIn(b"hidden", body)
@@ -269,24 +272,24 @@ class DistServeTest(ServeTests):
 
     def test_files_come_from_the_built_site(self) -> None:
         for rel in ("index.html", "terms/index.html", "404.html", "static/styles.css", "robots.txt"):
-            status, _, body = self.server.get("/receipts-explorer/" + rel)
+            status, _, body = self.server.get("/" + rel)
             self.assertEqual((status, body), (200, (self.out / rel).read_bytes()), rel)
 
     def test_a_redirect_quotes_the_path(self) -> None:
-        status, headers, _ = self.server.get("/receipts-explorer/a%20b")
-        self.assertEqual((status, headers.get("Location")), (301, "/receipts-explorer/a%20b/"))
-        status, _, _ = self.server.get("/receipts-explorer/a%20b/")
+        status, headers, _ = self.server.get("/a%20b")
+        self.assertEqual((status, headers.get("Location")), (301, "/a%20b/"))
+        status, _, _ = self.server.get("/a%20b/")
         self.assertEqual(status, 200)
 
     def test_a_path_with_a_line_break_is_not_found_even_where_a_page_has_that_name(self) -> None:
-        for path in ("/receipts-explorer/x%0d%0aSet-Cookie:%20a=b", "/receipts-explorer/x%0d%0aSet-Cookie:%20a=b/"):
+        for path in ("/x%0d%0aSet-Cookie:%20a=b", "/x%0d%0aSet-Cookie:%20a=b/"):
             status, headers, _ = self.server.get(path)
             self.assertEqual(status, 404, path)
             self.assertIsNone(headers.get("Location"), path)
             self.assertIsNone(headers.get("Set-Cookie"), path)
 
     def test_not_found_is_the_built_404_page(self) -> None:
-        status, _, body = self.server.get("/receipts-explorer/nope/")
+        status, _, body = self.server.get("/nope/")
         self.assertEqual((status, body), (404, (self.out / "404.html").read_bytes()))
 
     def test_the_default_site_is_dist(self) -> None:

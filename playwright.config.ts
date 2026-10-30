@@ -16,10 +16,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
-  use: { baseURL: `http://127.0.0.1:${String(PORT)}/receipts-explorer/`, trace: "retain-on-failure" },
+  use: { baseURL: `http://127.0.0.1:${String(PORT)}/`, trace: "retain-on-failure" },
   webServer: {
     command: `python3 serve.py --dist ${String(PORT)}`,
-    url: `http://127.0.0.1:${String(PORT)}/receipts-explorer/`,
+    url: `http://127.0.0.1:${String(PORT)}/`,
     reuseExistingServer: false,
   },
   projects: [

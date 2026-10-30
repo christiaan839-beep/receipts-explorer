@@ -79,7 +79,7 @@ class BuildTest(unittest.TestCase):
     def test_the_sitemap_lists_every_route_once_and_nothing_else(self) -> None:
         sitemap = (self.dist / "sitemap.xml").read_text(encoding="utf-8")
         locs = re.findall(r"<loc>([^<]*)</loc>", sitemap)
-        self.assertEqual(locs, [f"https://christiaan839-beep.github.io/receipts-explorer{route}" for route in all_routes()])
+        self.assertEqual(locs, [f"https://verify.sovereignmatrix.co.za{route}" for route in all_routes()])
         self.assertTrue(all(loc.startswith("https://") for loc in locs))
         self.assertNotIn("404", sitemap)
         self.assertNotIn("lastmod", sitemap)
@@ -89,9 +89,7 @@ class BuildTest(unittest.TestCase):
 
     def test_robots_allows_all_and_names_the_sitemap(self) -> None:
         robots = (self.dist / "robots.txt").read_text(encoding="utf-8").splitlines()
-        self.assertEqual(
-            robots, ["User-agent: *", "Allow: /", "Sitemap: https://christiaan839-beep.github.io/receipts-explorer/sitemap.xml"]
-        )
+        self.assertEqual(robots, ["User-agent: *", "Allow: /", "Sitemap: https://verify.sovereignmatrix.co.za/sitemap.xml"])
 
     def test_a_rebuild_is_byte_identical_and_leaves_nothing_beside_it(self) -> None:
         run_build(self.dist)

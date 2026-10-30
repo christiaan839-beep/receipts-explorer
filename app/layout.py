@@ -23,7 +23,7 @@ CSP = (
 
 
 def url(path: str) -> str:
-    """A site path under the base path, such as /receipts-explorer/terms/."""
+    """A site path under the base path (the root, on verify.sovereignmatrix.co.za), such as /terms/."""
     return SITE["base_path"] + path
 
 

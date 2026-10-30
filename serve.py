@@ -4,7 +4,7 @@
 Usage:  python3 serve.py [port]           render pages live from app/ (default port 8000)
         python3 serve.py --dist [port]    serve the built dist/, as GitHub Pages does
 
-Both serve the site under /receipts-explorer/, as GitHub Pages does, and
+Both serve the site at the root, /, as GitHub Pages does, and
 answer unknown paths with the 404 page. Live mode reads static/ and
 build/check.js (run npm run bundle first) on every request.
 
@@ -96,7 +96,7 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         if any(c in path for c in "\r\n\0"):
             return self._not_found()
-        if path in ("/", BASE):
+        if BASE and path in ("/", BASE):
             return self._send("", status=301, location=BASE + "/")
         if not path.startswith(BASE + "/"):
             return self._not_found()

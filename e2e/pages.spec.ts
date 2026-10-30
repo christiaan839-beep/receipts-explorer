@@ -11,9 +11,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { HONEST, VALID, fill, stubLog } from "./helpers.ts";
 
-const BASE = "/receipts-explorer";
+const BASE = "";
 const SITEMAP = readFileSync(new URL("../dist/sitemap.xml", import.meta.url), "utf8");
-const LISTED = [...SITEMAP.matchAll(/<loc>[^<]*?\/receipts-explorer(\/[^<]*)<\/loc>/g)].map((m) => m[1] ?? "/");
+const LISTED = [...SITEMAP.matchAll(/<loc>https:\/\/verify\.sovereignmatrix\.co\.za(\/[^<]*)<\/loc>/g)].map((m) => m[1] ?? "/");
 // Every page in the sitemap, and the 404 page, which is not listed in it.
 const ROUTES = [...LISTED, "/404.html"];
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];

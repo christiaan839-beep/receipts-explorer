@@ -12,7 +12,7 @@ from app.ontology import Term
 from app.pages import all_routes, page_term, render_not_found, render_route
 
 ASSETS = {"styles": "sha384-styles", "script": "sha384-script"}
-BASE = "/receipts-explorer"
+BASE = ""
 STATIC = {f"{BASE}/static/styles.css", f"{BASE}/static/check.js", f"{BASE}/static/img/favicon.svg"}
 
 
@@ -128,7 +128,7 @@ class PagesTest(unittest.TestCase):
                     self.assertEqual(p.meta("name", "robots"), "index, follow")
                     canonical = next(a["href"] for a in p.all("link") if a.get("rel") == "canonical")
                     self.assertEqual(og_urls, [canonical])
-                    self.assertTrue(canonical.startswith("https://christiaan839-beep.github.io/receipts-explorer/"))
+                    self.assertTrue(canonical.startswith("https://verify.sovereignmatrix.co.za/"))
 
     def test_the_stylesheet_carries_its_hash(self) -> None:
         for route, html in PAGES.items():

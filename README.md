@@ -7,7 +7,7 @@ in your browser: that the issuer signed exactly this text, that the receipt
 does not contradict itself, and, given a [receipts-log](https://github.com/christiaan839-beep/receipts-log)
 address, that the receipt is in the log and that witnesses saw the same log.
 
-**<https://christiaan839-beep.github.io/receipts-explorer/>**
+**<https://verify.sovereignmatrix.co.za/>**
 
 Your receipt is not uploaded. Receipts and keys stay in the browser tab; if
 you give a log address, the page sends that log only GET requests, carrying
@@ -73,24 +73,26 @@ receipt, and for nothing after a tree head that fails.
   dependencies and WebCrypto's Ed25519. Its verifier is a browser
   port of verifiable-receipts' at a pinned commit (`third_party/verifiable-receipts/`).
   The only code that makes requests is `src/log-client.ts`.
-- **Hosting**: GitHub Pages, deployed from `main` by `.github/workflows/deploy.yml`,
+- **Hosting**: GitHub Pages, at the root of its own domain,
+  `verify.sovereignmatrix.co.za`, deployed from `main` by `.github/workflows/deploy.yml`,
   which runs CI, builds `dist/`, checks the size budget and attests the
   build provenance of every file before it deploys. A Content Security
   Policy allows scripts and styles from the site only, no inline code, and
   connections over https only; in a browser that enforces Trusted Types it
   also refuses HTML built from strings. The stylesheet and the script carry
   Subresource Integrity hashes.
-- **Search engines**: crawlers read `robots.txt` only at the host root, so
-  the one `build.py` writes has no effect under this project path. Submit
-  <https://christiaan839-beep.github.io/receipts-explorer/sitemap.xml> in
-  Google Search Console and Bing Webmaster Tools instead.
+- **Search engines**: the site is at the root of its host, so crawlers read
+  the `robots.txt` that `build.py` writes, and its `Sitemap:` line names
+  <https://verify.sovereignmatrix.co.za/sitemap.xml>. Submitting the sitemap
+  in Google Search Console and Bing Webmaster Tools as well gets it read
+  sooner.
 
 ## Run it
 
 ```bash
 npm ci
 npm run bundle            # build/check.js
-python3 serve.py          # live render at http://127.0.0.1:8000/receipts-explorer/
+python3 serve.py          # live render at http://127.0.0.1:8000/
 python3 serve.py --dist   # or the built dist/ (npm run build first), as GitHub Pages serves it
 npm run check             # type check, lint, unit tests, build dist/, size budget
 npx playwright install chromium firefox webkit

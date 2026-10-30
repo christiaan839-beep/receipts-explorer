@@ -34,7 +34,7 @@ page never reaches, because the page refuses that input first or because
 the browser fails the page's own Ed25519 check and runs nothing (report
 those to the browser's maker).
 
-## Framing, and the origin the site shares
+## Framing, and the site's own origin
 
 GitHub Pages cannot send response headers, and a Content Security Policy
 in a meta tag ignores `frame-ancestors`, so the site cannot forbid other
@@ -42,14 +42,12 @@ sites to frame it. The page refuses to run inside a frame instead: when
 `top !== self` it shows the `#framed` notice and checks nothing, so another
 site cannot show the page's verdicts as its own.
 
-The site is served from `christiaan839-beep.github.io`, an origin it shares
-with every other GitHub Pages project site of that account. The browser
-treats them as one origin: a script on one of those sites could, for
-example, reach into this page in a window it opened, and a service
-worker served from the origin's root (the account's user site,
-`christiaan839-beep.github.io` itself) could answer this page's
-requests. The page stores nothing, so no visitor data waits on that
-origin. A custom domain would give the site an origin of its own.
+The site is served from `https://verify.sovereignmatrix.co.za`, an origin
+of its own: no other site, and no other GitHub Pages site of the account,
+shares it, so none can reach into this page in a window it opened or
+register a service worker that answers its requests. The Content Security
+Policy's `'self'` means this origin only. The page stores nothing, so no
+visitor data waits on it either.
 
 ## Browsers
 

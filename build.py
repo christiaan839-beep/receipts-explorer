@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the site to ./dist, as GitHub Pages serves it under /receipts-explorer/.
+"""Writes the site to ./dist, as GitHub Pages serves it at the root of verify.sovereignmatrix.co.za.
 
 Usage:  npm run bundle && python3 build.py [--out DIR]
 

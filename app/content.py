@@ -11,8 +11,8 @@ VR_REF = (VENDORED / "VR_REF").read_text(encoding="utf-8").strip()
 
 SITE = {
     "name": "Receipts explorer",
-    "base_url": "https://christiaan839-beep.github.io/receipts-explorer",
-    "base_path": "/receipts-explorer",
+    "base_url": "https://verify.sovereignmatrix.co.za",
+    "base_path": "",
     "locale": "en-ZA",
     "og_locale": "en_ZA",
     "description": (
