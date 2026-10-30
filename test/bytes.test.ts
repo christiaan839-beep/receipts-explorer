@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { Ed25519Unavailable, ed25519Verify, fromBase64, fromHex, toBase64, toHex, utf8 } from "../src/bytes.ts";
+import { Ed25519Unavailable, ed25519Verify, fromBase64, fromHex, sBelowOrder, toBase64, toHex, utf8 } from "../src/bytes.ts";
 
 describe("fromHex", () => {
   it("decodes hex in either case", () => {
@@ -60,6 +60,56 @@ describe("ed25519Verify", () => {
   it("answers false, not true, when WebCrypto refuses a key of another kind", async () => {
     const { publicKey } = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
     assert.equal(await ed25519Verify(publicKey, fromHex(SIG), new Uint8Array(0)), false);
+  });
+
+  // L, the group order, as 32 little-endian bytes in hex.
+  const L = "edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
+  const leAdd = (a: string, b: string): string => {
+    const x = fromHex(a);
+    const y = fromHex(b);
+    const out = new Uint8Array(32);
+    let carry = 0;
+    for (let i = 0; i < 32; i++) {
+      const t = (x[i] ?? 0) + (y[i] ?? 0) + carry;
+      out[i] = t & 0xff;
+      carry = t >> 8;
+    }
+    return toHex(out);
+  };
+  const R = SIG.slice(0, 64);
+  const S = SIG.slice(64);
+
+  it("knows which S values are below L", () => {
+    assert.equal(sBelowOrder(fromHex(SIG)), true);
+    assert.equal(sBelowOrder(fromHex(R + "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010")), true, "L - 1");
+    assert.equal(sBelowOrder(fromHex(R + "0".repeat(64))), true, "0");
+    assert.equal(sBelowOrder(fromHex(R + L)), false, "L");
+    assert.equal(sBelowOrder(fromHex(R + "eed3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010")), false, "L + 1");
+    assert.equal(sBelowOrder(fromHex(R + leAdd(S, L))), false, "S + L");
+    assert.equal(sBelowOrder(fromHex(R + "edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000011")), false, "a higher top byte");
+    assert.equal(sBelowOrder(fromHex(R + "f".repeat(64))), false, "2^256 - 1");
+    assert.equal(sBelowOrder(fromHex(SIG.slice(2))), false, "63 bytes");
+  });
+
+  it("answers false for S of L or more before WebCrypto sees it, even a WebCrypto that would accept it", async () => {
+    // WebKit on Linux accepts S + L; a stub that says yes to everything stands in for it.
+    const key = await crypto.subtle.importKey("raw", fromHex(PUBLIC), { name: "Ed25519" }, false, ["verify"]);
+    const original = crypto.subtle.verify.bind(crypto.subtle);
+    let calls = 0;
+    crypto.subtle.verify = () => {
+      calls++;
+      return Promise.resolve(true);
+    };
+    try {
+      for (const bad of [leAdd(S, L), L, "f".repeat(64)]) {
+        assert.equal(await ed25519Verify(key, fromHex(R + bad), new Uint8Array(0)), false, bad);
+      }
+      assert.equal(calls, 0);
+      assert.equal(await ed25519Verify(key, fromHex(SIG), new Uint8Array(0)), true);
+      assert.equal(calls, 1);
+    } finally {
+      crypto.subtle.verify = original;
+    }
   });
 
   it("throws Ed25519Unavailable when WebCrypto has no Ed25519", async () => {

@@ -5,8 +5,9 @@
 // in every browser Playwright runs. The page's verdict must be the same in every browser, so
 // the vectors are split by the page's own code, run here in Node first: the
 // key reader (parsePublicKeys) refuses some keys before WebCrypto sees them,
-// and check 1 refuses a receipt with no canonical text before check 2
-// verifies anything. (a) Through the page, every browser must refuse those
+// check 1 refuses a receipt with no canonical text before check 2
+// verifies anything, and ed25519Verify answers false for an S of L or more
+// (sBelowOrder) without asking WebCrypto. (a) Through the page, every browser must refuse those
 // in the same words, and give every other vector Node's verdict. (b) Every
 // vector that reaches WebCrypto must get Node's answer from the browser's
 // own WebCrypto. A browser that differed would judge receipts differently.
@@ -14,6 +15,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
+import { fromHex, sBelowOrder } from "../src/bytes.ts";
 import { checkOffline } from "../src/checks.ts";
 import { KeyError, parsePublicKeys } from "../src/keys.ts";
 import { fill, statusOf } from "./helpers.ts";
@@ -70,7 +72,7 @@ const TEST_1: Vector = {
 };
 
 const CASES = await Promise.all([...VECTORS, TEST_1].map(pageCase));
-const REACHING = CASES.filter((c) => c.keyProblem === undefined && c.format === "passed");
+const REACHING = CASES.filter((c) => c.keyProblem === undefined && c.format === "passed" && sBelowOrder(fromHex(c.sig)));
 
 test("through the page, every edge vector gets Node's verdict: refused keys and receipts in the page's own words, the rest verified", async ({ page }) => {
   expect(CASES).toHaveLength(17);
