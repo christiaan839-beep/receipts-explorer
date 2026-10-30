@@ -11,7 +11,7 @@
 // a WebCrypto stub that says yes to everything changes no verdict.
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import { describe, it } from "node:test";
+import { describe, it, mock } from "node:test";
 
 import { ed25519Verify, fromHex } from "../src/bytes.ts";
 import { checkOffline, type CheckResult, type ReceiptReport } from "../src/checks.ts";
@@ -101,6 +101,24 @@ describe("the strict Ed25519 profile, through the page", () => {
       });
     });
   }
+
+  it("the key reader never imports a refused key: WebKit on Linux crashes verifying under the identity key or a key off the curve", async () => {
+    const vectors = readJson(new URL("./fixtures/ed25519/", import.meta.url), "vectors.json") as { name: string; spki: string; reason?: string }[];
+    const pems = [
+      ...RECEIPTS.map((n) => readJson(CONFORMANCE, n) as Vector & { publicKeyPem: string }).filter((v) => v.expected.reasonContains?.startsWith("public key is ") === true).map((v) => v.publicKeyPem),
+      ...vectors.filter((v) => v.reason?.startsWith("public key is ") === true).map((v) => `-----BEGIN PUBLIC KEY-----\n${v.spki}\n-----END PUBLIC KEY-----\n`),
+    ];
+    assert.ok(vectors.some((v) => v.name === "identity key, R=identity, S=0" && v.reason === "public key is a small-order point"));
+    assert.ok(vectors.some((v) => v.name === "key not on curve (02 00..)" && v.reason === "public key is not a point on the curve"));
+    assert.equal(pems.length, 16);
+    const imports = mock.method(crypto.subtle, "importKey", () => Promise.reject(new Error("importKey called")));
+    try {
+      for (const pem of pems) await assert.rejects(parsePublicKeys(pem, "The issuer key"), KeyError);
+      assert.equal(imports.mock.callCount(), 0);
+    } finally {
+      imports.mock.restore();
+    }
+  });
 
   it("ed25519Verify refuses a signature with a bad R or S before WebCrypto sees it", async () => {
     for (const name of RECEIPTS) {

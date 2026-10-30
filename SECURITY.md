@@ -85,9 +85,15 @@ answer. What the engines were seen to do without them:
 
 - Node.js 24.22.1 (OpenSSL 3.5.9) refuses R = identity, and the small-order
   keys, which Node.js 22.23.2 (OpenSSL 3.5.7) accepts.
-- WebKit 27.2 on Linux (Playwright's build on ubuntu-latest) verified a
-  signature with S + L, and refused a mixed-order key under which the
-  cofactorless check holds.
+- WebKit 27.2 on Linux (Playwright's build on ubuntu-latest) verified
+  signatures with S + L and S + 2L, with R = identity, and under an
+  order-8 key where the cofactorless check fails; it refused a mixed-order
+  key under which the cofactorless check holds; and its web process
+  crashed, closing the page, when asked to verify under the identity key
+  (01 00 ... 00, with R = identity and S = 0) or under a key off the curve
+  (y = 2). The page never gives WebCrypto those keys: the key reader
+  refuses them, as a small-order point and as not a point on the curve,
+  before it imports them.
 - WebKit 27.2 on macOS, and Firefox 157, refuse the identity key with
   y = p + 1 and with the sign bit set, which Node.js 22 accepts.
 - WebKit 27.2 answers false to RFC 8032 test 1, the empty message.
