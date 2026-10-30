@@ -184,9 +184,11 @@ test("inside another site's frame, the page refuses to run and says so", async (
 });
 
 test("the whole flow works from the keyboard", async ({ page, browserName }) => {
-  // WebKit, like Safari, moves Tab past links and buttons unless the visitor
-  // asks it not to; Option-Tab (Alt+Tab) reaches every one, as in Safari.
-  const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+  // WebKit on macOS, like Safari, moves Tab past links and buttons unless the
+  // visitor asks it not to; Option-Tab (Alt+Tab) reaches every one, as in
+  // Safari. Elsewhere (Linux, in CI) WebKit's Tab reaches them, and Option
+  // does not change what Tab reaches, so plain Tab is the key there.
+  const tab = browserName === "webkit" && process.platform === "darwin" ? "Alt+Tab" : "Tab";
   /** Presses Tab until `target` has focus, at most `max` times. */
   const tabTo = async (target: Locator, max: number): Promise<void> => {
     for (let i = 0; i < max && !(await target.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press(tab);

@@ -1,0 +1,35 @@
+# Weekly updates, grouped per ecosystem. A release must be 14 days old
+# before Dependabot proposes it, so a compromised release has time to be
+# caught and pulled first. Security updates are not delayed. Every npm
+# package is a development tool; nothing from npm is shipped except what
+# esbuild bundles from src/, which has no dependencies.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    ignore:
+      # The types follow the oldest Node the tests support (engines).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm-development:
+        dependency-type: development
+  - package-ecosystem: pip
+    directory: /.github/tools/python-ci
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14

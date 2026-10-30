@@ -1,0 +1,66 @@
+# Publishes the site to GitHub Pages from main: runs CI, builds dist/,
+# checks the size budget, attests the build provenance of every file it
+# deploys, and deploys. Only main can deploy (the github-pages environment
+# allows main only).
+#
+# Actions are pinned to full commit SHAs (the tag each SHA had when pinned
+# is in the comment). Every job starts with no token permissions and asks
+# only for what it uses.
+name: deploy
+on:
+  push:
+    branches: [main]
+permissions: {}
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  ci:
+    name: CI
+    uses: $/.github/workflows/ci.yml
+    permissions:
+      contents: read # check out the code to test
+
+  build:
+    name: Build and attest
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read # check out the code
+      id-token: write # sign the provenance attestation (Sigstore)
+      attestations: write # store the attestation on GitHub
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm run build
+      - run: python scripts/check_budget.py dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/**
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write # deploy to Pages
+      id-token: write # prove the deployment came from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
