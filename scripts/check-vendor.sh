@@ -2,7 +2,7 @@
 # Checks every file copied from verifiable-receipts against a checkout of it
 # at the commit in third_party/verifiable-receipts/VR_REF, and fails closed:
 # each vendored directory must hold exactly the files listed here, and
-# SHA256SUMS must list exactly the three sources the browser ports are made
+# SHA256SUMS must list exactly the five sources the browser ports are made
 # from. CI runs it in the vendor job; run it locally, from the repository
 # root, against an export of that commit.
 #
@@ -39,14 +39,16 @@ if [[ -e "$upstream/.git" ]]; then
   [[ "$head" == "$ref" ]] || fail "$tp/VR_REF" "the upstream checkout is at $head, not $ref"
 fi
 
-# SHA256SUMS: exactly the three ported sources (transparency.ts inlines
-# isHashHex from hash.ts), each with a matching hash.
+# SHA256SUMS: exactly the five ported sources (transparency.ts inlines
+# isHashHex from hash.ts; receipt.ts uses the ed25519-key.ts and
+# edwards25519.ts ports for the strict checks verify-v2.mjs writes out),
+# each with a matching hash.
 # sha256sum skips lines it cannot read and passes an empty file, so the
 # listed paths are checked first.
 [[ -f "$tp/SHA256SUMS" ]] || fail "$tp/SHA256SUMS" "is missing"
 sums_paths=$(sed -E 's/^[0-9a-f]{64}  //' "$tp/SHA256SUMS" | sort)
-[[ "$sums_paths" == "$(printf '%s\n' packages/verifiable-receipts/conformance/verify-v2.mjs packages/verifiable-receipts/src/hash.ts packages/verifiable-receipts/src/transparency.ts | sort)" ]] ||
-  fail "$tp/SHA256SUMS" "must list exactly conformance/verify-v2.mjs, src/hash.ts and src/transparency.ts, one '<sha256>  <path>' line each"
+[[ "$sums_paths" == "$(printf '%s\n' packages/verifiable-receipts/conformance/verify-v2.mjs packages/verifiable-receipts/src/ed25519-key.ts packages/verifiable-receipts/src/edwards25519.ts packages/verifiable-receipts/src/hash.ts packages/verifiable-receipts/src/transparency.ts | sort)" ]] ||
+  fail "$tp/SHA256SUMS" "must list exactly conformance/verify-v2.mjs, src/ed25519-key.ts, src/edwards25519.ts, src/hash.ts and src/transparency.ts, one '<sha256>  <path>' line each"
 (cd "$upstream" && sha256sum --strict -c --quiet "$OLDPWD/$tp/SHA256SUMS") ||
   fail "$tp/SHA256SUMS" "a ported source changed; update the port"
 
@@ -69,8 +71,8 @@ for f in tree-head.json cosignature.json; do
 done
 
 # The ports: exactly these files, each naming VR_REF.
-printf '%s\n' receipt.ts transparency.ts | exactly src/vendor/verifiable-receipts
-for f in receipt.ts transparency.ts; do
+printf '%s\n' ed25519-key.ts edwards25519.ts receipt.ts transparency.ts | exactly src/vendor/verifiable-receipts
+for f in ed25519-key.ts edwards25519.ts receipt.ts transparency.ts; do
   grep -q "third_party/verifiable-receipts/VR_REF" "src/vendor/verifiable-receipts/$f" ||
     fail "src/vendor/verifiable-receipts/$f" "does not name third_party/verifiable-receipts/VR_REF"
 done

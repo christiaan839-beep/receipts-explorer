@@ -67,20 +67,40 @@ page never asks WebCrypto about an empty message: a receipt whose canonical
 text is empty fails Format before any signature is checked, and tree heads
 and cosignatures are verified over their JSON text, which is never empty.
 
-Firefox 157 and WebKit 27.2 also differ from Node on two of the Ed25519
-edge vectors (`test/fixtures/ed25519/`), both identity keys: the
-non-canonical encoding y = p + 1, and the encoding with the sign bit set.
-Node verifies both signatures; those browsers do not. The page refuses both
-keys as small-order points when it reads them, before WebCrypto sees them,
-so every browser gives the same verdict.
+The engines' Ed25519 differs on keys and signatures at the edges of
+RFC 8032, so the page does not leave those to WebCrypto. It applies the
+strict profile of VAOS 2.0 section 7.3, the same code as verifiable-receipts
+at `VR_REF` (`src/vendor/verifiable-receipts/ed25519-key.ts` and
+`edwards25519.ts`), before WebCrypto sees a key or a signature: a key, and
+a signature's R, must each be the canonical encoding of a point of order L
+(not a non-canonical encoding, not off the curve, not of small order, the
+identity included, and not of mixed order), and S must be below L. The key
+reader refuses such a key with the verifier's reason ("public key is a
+small-order point", "... is not a canonical encoding", "... is not a point
+on the curve", "... is not in the prime-order subgroup"); check 2 fails
+such a signature with its reason ("signature R is ..."), or, for an S of L
+or more, as a signature that does not verify. On what passes these checks
+every correct Ed25519 verifier, cofactored or cofactorless, gives the same
+answer. What the engines were seen to do without them:
+
+- Node.js 24.22.1 (OpenSSL 3.5.9) refuses R = identity, and the small-order
+  keys, which Node.js 22.23.2 (OpenSSL 3.5.7) accepts.
+- WebKit 27.2 on Linux (Playwright's build on ubuntu-latest) verified a
+  signature with S + L, and refused a mixed-order key under which the
+  cofactorless check holds.
+- WebKit 27.2 on macOS, and Firefox 157, refuse the identity key with
+  y = p + 1 and with the sign bit set, which Node.js 22 accepts.
+- WebKit 27.2 answers false to RFC 8032 test 1, the empty message.
 
 `e2e/ed25519.spec.ts` checks this in Chromium, Firefox and WebKit on
-every pull request, with the edge vectors and RFC 8032 test 1 run
-through the page. A receipt, tree head or cosignature to which the page
+every pull request: the 16 edge vectors, the 17 receipts of the corpus's
+strict vectors and RFC 8032 test 1 are run through the page, which must
+give each the same refusal, verdict and words in every browser; and the
+browser's own WebCrypto must give the strict verdict on every case the page
+passes on to it. A receipt, tree head or cosignature to which the page
 gives a different verdict in one supported browser than in another, or
-than Node gives it, is in scope, even when the cause is a WebCrypto bug:
-the page must refuse that input before WebCrypto sees it, as it does the
-two cases above.
+than verifiable-receipts gives it, is in scope, even when the cause is a
+WebCrypto bug: the page must refuse that input before WebCrypto sees it.
 
 ## Supported versions
 

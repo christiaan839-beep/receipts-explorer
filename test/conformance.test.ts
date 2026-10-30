@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { verifyV2Receipt } from "../src/vendor/verifiable-receipts/receipt.ts";
+import { verifyEd25519Strict, verifyV2Receipt } from "../src/vendor/verifiable-receipts/receipt.ts";
 import { verifyInclusionProof } from "../src/vendor/verifiable-receipts/transparency.ts";
 import { CONFORMANCE, conformanceCase, readJson } from "./helpers.ts";
 
@@ -21,11 +21,13 @@ interface Expected {
 const files = readdirSync(CONFORMANCE).filter((f) => f.endsWith(".json")).sort();
 
 describe("conformance corpus", () => {
-  it("holds the 30 fixtures of the source corpus", () => {
-    assert.equal(files.length, 30);
+  it("holds the 50 fixtures of the source corpus", () => {
+    assert.equal(files.length, 50);
+    assert.equal(files.filter((f) => f.startsWith("ed25519-")).length, 20);
   });
 
-  for (const name of files.filter((f) => f.startsWith("v2-"))) {
+  // The receipts: v2-*, and the ed25519-* vectors of the strict profile (VAOS 2.0 section 7.3) given as receipts.
+  for (const name of files.filter((f) => f.startsWith("v2-") || (f.startsWith("ed25519-") && !("ed25519" in (readJson(CONFORMANCE, f) as object))))) {
     it(`receipt ${name}`, async () => {
       // receiptText: the receipt as text, read by parseReceipt, whose refusal is a rejection with
       // its reason. publicKeyPem: the key to verify with, in place of public-key.pem.
@@ -39,6 +41,19 @@ describe("conformance corpus", () => {
       assert.equal(result.ok, c.expected.ok, result.reason);
       if (c.expected.reasonContains !== undefined) {
         assert.match(result.reason ?? "", new RegExp(c.expected.reasonContains, "i"));
+      }
+    });
+  }
+
+  // The ed25519-* vectors given as one raw signature: verifyEd25519Strict, as the original's harness runs them.
+  for (const name of files.filter((f) => f.startsWith("ed25519-") && "ed25519" in (readJson(CONFORMANCE, f) as object))) {
+    it(`signature ${name}`, async () => {
+      const f = readJson(CONFORMANCE, name) as { ed25519: { publicKey: string; message: string; signature: string }; expected: Expected };
+      const hex = (h: string): Uint8Array<ArrayBuffer> => new Uint8Array(Buffer.from(h, "hex"));
+      const result = await verifyEd25519Strict(hex(f.ed25519.publicKey), hex(f.ed25519.message), hex(f.ed25519.signature));
+      assert.equal(result.ok, f.expected.ok, result.reason);
+      if (f.expected.reasonContains !== undefined) {
+        assert.match(result.reason ?? "", new RegExp(f.expected.reasonContains, "i"));
       }
     });
   }

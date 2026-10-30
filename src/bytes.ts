@@ -4,6 +4,8 @@
 // Bytes for the browser: UTF-8, hex, base64 and SHA-256, with WebCrypto
 // and no Buffer, so the same code runs in a page and under node --test.
 
+import { ed25519SignatureProblem } from "./vendor/verifiable-receipts/ed25519-key.ts";
+
 const encoder = new TextEncoder();
 
 /** The UTF-8 bytes of `text`; a lone surrogate becomes U+FFFD, as in Buffer.from. */
@@ -72,40 +74,20 @@ export function isUnsupported(e: unknown): boolean {
   return e instanceof DOMException && e.name === "NotSupportedError";
 }
 
-// The group order L = 2^252 + 27742317777372353535851937790883648493,
-// as 32 little-endian bytes.
-const ORDER_LE = [
-  0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
-];
-
-/**
- * True when a 64-byte signature's S (its last 32 bytes, little-endian) is
- * less than the group order L, as VAOS 2.0 section 7.3 and RFC 8032
- * section 5.1.7 require. Not every WebCrypto checks it: WebKit on Linux
- * accepts S + L, so the page checks it itself, before WebCrypto sees the
- * signature.
- */
-export function sBelowOrder(signature: Uint8Array): boolean {
-  if (signature.length !== 64) return false;
-  for (let i = 31; i >= 0; i--) {
-    const s = signature[32 + i] ?? 0;
-    const l = ORDER_LE[i] ?? 0;
-    if (s !== l) return s < l;
-  }
-  return false;
-}
-
 /**
  * Ed25519 verification. Answers false, never throws, for a malformed
  * signature or a key of another kind; throws Ed25519Unavailable when this
  * browser cannot verify Ed25519 at all, so the caller reports "not run",
- * never "failed". A signature whose S is not less than L is false before
- * WebCrypto sees it.
+ * never "failed". A signature that the strict profile of VAOS 2.0
+ * section 7.3 refuses (ed25519SignatureProblem: its R is not a canonical
+ * encoding of a point of order L, or its S is not below L) is false
+ * before WebCrypto sees it, so every engine gives it the same answer. The
+ * key's half of the rule is applied when the key is read
+ * (src/keys.ts parsePublicKeys) and again by check 2.
  */
 export async function ed25519Verify(key: CryptoKey, signature: Uint8Array<ArrayBuffer>, data: Uint8Array<ArrayBuffer>): Promise<boolean> {
   if (typeof crypto === "undefined" || typeof crypto.subtle === "undefined") throw new Ed25519Unavailable();
-  if (signature.length === 64 && !sBelowOrder(signature)) return false;
+  if (ed25519SignatureProblem(signature) !== null) return false;
   try {
     return await crypto.subtle.verify({ name: "Ed25519" }, key, signature, data);
   } catch (e) {

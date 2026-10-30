@@ -4,7 +4,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { Ed25519Unavailable, ed25519Verify, fromBase64, fromHex, sBelowOrder, toBase64, toHex, utf8 } from "../src/bytes.ts";
+import { Ed25519Unavailable, ed25519Verify, fromBase64, fromHex, toBase64, toHex, utf8 } from "../src/bytes.ts";
+import { DOES_NOT_VERIFY, ed25519SignatureProblem } from "../src/vendor/verifiable-receipts/ed25519-key.ts";
 
 describe("fromHex", () => {
   it("decodes hex in either case", () => {
@@ -79,16 +80,17 @@ describe("ed25519Verify", () => {
   const R = SIG.slice(0, 64);
   const S = SIG.slice(64);
 
-  it("knows which S values are below L", () => {
-    assert.equal(sBelowOrder(fromHex(SIG)), true);
-    assert.equal(sBelowOrder(fromHex(R + "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010")), true, "L - 1");
-    assert.equal(sBelowOrder(fromHex(R + "0".repeat(64))), true, "0");
-    assert.equal(sBelowOrder(fromHex(R + L)), false, "L");
-    assert.equal(sBelowOrder(fromHex(R + "eed3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010")), false, "L + 1");
-    assert.equal(sBelowOrder(fromHex(R + leAdd(S, L))), false, "S + L");
-    assert.equal(sBelowOrder(fromHex(R + "edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000011")), false, "a higher top byte");
-    assert.equal(sBelowOrder(fromHex(R + "f".repeat(64))), false, "2^256 - 1");
-    assert.equal(sBelowOrder(fromHex(SIG.slice(2))), false, "63 bytes");
+  it("refuses an S of L or more, and nothing below it, with RFC 8032 test 1's R", () => {
+    const sProblem = (s: string): string | null => ed25519SignatureProblem(fromHex(R + s));
+    assert.equal(ed25519SignatureProblem(fromHex(SIG)), null);
+    assert.equal(sProblem("ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010"), null, "L - 1");
+    assert.equal(sProblem("0".repeat(64)), null, "0");
+    assert.equal(sProblem(L), DOES_NOT_VERIFY, "L");
+    assert.equal(sProblem("eed3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010"), DOES_NOT_VERIFY, "L + 1");
+    assert.equal(sProblem(leAdd(S, L)), DOES_NOT_VERIFY, "S + L");
+    assert.equal(sProblem("edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000011"), DOES_NOT_VERIFY, "a higher top byte");
+    assert.equal(sProblem("f".repeat(64)), DOES_NOT_VERIFY, "2^256 - 1");
+    assert.equal(ed25519SignatureProblem(fromHex(SIG.slice(2))), DOES_NOT_VERIFY, "63 bytes");
   });
 
   it("answers false for S of L or more before WebCrypto sees it, even a WebCrypto that would accept it", async () => {

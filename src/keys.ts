@@ -8,7 +8,7 @@
 // key must re-export to exactly those bytes. A problem is an error that
 // says what to do, never a block silently dropped.
 import { Ed25519Unavailable, fromBase64, isUnsupported, sha256Hex, toHex } from "./bytes.ts";
-import { weakKeyReason } from "./vendor/verifiable-receipts/receipt.ts";
+import { ed25519PublicKeyProblem } from "./vendor/verifiable-receipts/ed25519-key.ts";
 
 /** An Ed25519 public key and the short name it is reported under. */
 export interface PublicKey {
@@ -25,14 +25,30 @@ const MARKER = /-----(BEGIN|END) ([A-Z0-9 ]+)-----/g;
 const ED25519_SPKI_PREFIX = "302a300506032b6570032100";
 
 /**
- * Why the verifier would refuse this key (a small-order point, or a
- * non-canonical encoding), or null. The list is the port's own
- * (weakKeyReason in the vendored receipt.ts), so the page refuses at
- * reading exactly the keys verification refuses.
+ * Why the verifier would refuse this key under the strict profile of VAOS
+ * 2.0 section 7.3 (not a canonical encoding of a point of order L), or
+ * null. The test is the port's own (ed25519PublicKeyProblem, vendored), so
+ * the page refuses at reading exactly the keys verification refuses, with
+ * the verifier's reason.
  */
 function weakKey(der: Uint8Array): string | null {
   if (der.length !== 44 || !toHex(der).startsWith(ED25519_SPKI_PREFIX)) return null;
-  return weakKeyReason(der.slice(12));
+  return ed25519PublicKeyProblem(der.slice(12));
+}
+
+/** What the page says about a key the verifier refuses, quoting the verifier's reason. */
+function weakKeyMessage(source: string, n: number, reason: string): string {
+  const block = `${source}, block ${String(n)},`;
+  switch (reason) {
+    case "public key is a small-order point":
+      return `${block} is a key of small order (${reason}), under which forged signatures verify. No real issuer, log or witness uses one: check where it came from.`;
+    case "public key is not in the prime-order subgroup":
+      return `${block} is a key of mixed order (${reason}), which no Ed25519 key generator makes and on which verifiers disagree. No real issuer, log or witness uses one: check where it came from.`;
+    case "public key is not a point on the curve":
+      return `${block} is not an Ed25519 key at all (${reason}), so no signature can verify under it. Copy the whole block again, or check where it came from.`;
+    default:
+      return `${block} is not the canonical encoding of its key (${reason}). No real issuer, log or witness writes one: check where it came from.`;
+  }
 }
 
 /**
@@ -101,12 +117,7 @@ async function readKey(body: string, source: string, n: number, seen: readonly P
     throw damaged;
   }
   const weak = weakKey(der);
-  if (weak === "public key is a small-order point") {
-    throw new KeyError(`${source}, block ${String(n)}, is a key of small order, under which forged signatures verify. No real issuer, log or witness uses one: check where it came from.`);
-  }
-  if (weak !== null) {
-    throw new KeyError(`${source}, block ${String(n)}, is not the canonical encoding of its key (${weak}). No real issuer, log or witness writes one: check where it came from.`);
-  }
+  if (weak !== null) throw new KeyError(weakKeyMessage(source, n, weak));
   let key: CryptoKey;
   try {
     key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, true, ["verify"]);

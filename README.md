@@ -25,7 +25,11 @@ quoted from `content/checks.json`, the same sentences the site shows.
 1. **Format**: a v2 receipt, its signature in the one valid spelling.
    - Proves: "The receipt is a v2 receipt, and its signature is written in the one valid spelling."
    - Does not prove: "Nothing about who signed it or whether its content is true."
-2. **Signature**: valid under the issuer key you give, named by fingerprint.
+2. **Signature**: valid under the issuer key you give, named by fingerprint,
+   under the strict Ed25519 rule of VAOS 2.0 section 7.3: a key or a
+   signature's R that is not the canonical encoding of a point of order L,
+   or an S of L or more, is refused before the browser's WebCrypto sees it,
+   so every browser gives the same verdict.
    - Proves: "The holder of this key signed exactly this text, and nobody changed it afterwards."
    - Does not prove: "That the key belongs to the issuer you think it does: that depends on where you got the key."
 3. **Content hash**: matches the signed text.

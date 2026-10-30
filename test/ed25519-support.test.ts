@@ -12,7 +12,7 @@ import { checkReceipts, type Inputs } from "../src/checks.ts";
 import { hasEd25519 } from "../src/ed25519-support.ts";
 import { KeyError, parsePublicKeys } from "../src/keys.ts";
 import { LogClient } from "../src/log-client.ts";
-import { weakKeyReason } from "../src/vendor/verifiable-receipts/receipt.ts";
+import { ed25519PublicKeyProblem } from "../src/vendor/verifiable-receipts/ed25519-key.ts";
 import { leafHash } from "../src/vendor/verifiable-receipts/transparency.ts";
 import { CONFORMANCE, LOG, fixtureReceipt, keyFrom, readJson } from "./helpers.ts";
 import { LOG_BASE, stubLog } from "./stub-log.ts";
@@ -109,7 +109,7 @@ describe("the identity-key edge vectors never reach WebCrypto", () => {
       const v = vectors.find((x) => x.name === name);
       assert.ok(v);
       const der = Buffer.from(v.spki, "base64");
-      assert.equal(weakKeyReason(new Uint8Array(der.subarray(12))), "public key is a small-order point");
+      assert.equal(ed25519PublicKeyProblem(new Uint8Array(der.subarray(12))), "public key is a small-order point");
       const imports = mock.method(subtle, "importKey", importKey);
       const verifies = mock.method(subtle, "verify", verify);
       const pem = `-----BEGIN PUBLIC KEY-----\n${v.spki}\n-----END PUBLIC KEY-----\n`;

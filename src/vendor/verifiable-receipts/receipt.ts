@@ -11,12 +11,18 @@
 // so verifyV2Receipt is async and takes a WebCrypto CryptoKey; the
 // non-canonical base64 test is fromBase64's round trip, caught here; the
 // public key's 32 bytes are read with WebCrypto's raw export instead of the
-// JWK x, so the key must be extractable (parsePublicKeys makes it so), and
-// the byte test is split out as weakKeyReason so that src/keys.ts refuses
-// the same keys with the same list; the signature-mismatch reason exported
-// as SIGNATURE_MISMATCH_REASON. When the browser has no WebCrypto Ed25519,
-// verifyV2Receipt throws Ed25519Unavailable instead of answering. No change
-// to the checks, their order or their failure reasons.
+// JWK x, so the key must be extractable (parsePublicKeys makes it so); the
+// strict checks of step 4 (the original's rawKeyProblem, pointProblem and
+// signatureProblem, with their edwards25519 arithmetic) are the library's
+// ed25519PublicKeyProblem and ed25519SignatureProblem, ported beside this
+// file from src/ed25519-key.ts and src/edwards25519.ts, which have the same
+// constants, checks, order and reasons, so that src/keys.ts and
+// src/bytes.ts refuse the same keys and signatures with the same code; the
+// signature-mismatch reason exported as SIGNATURE_MISMATCH_REASON;
+// verifyEd25519Strict is async and verifies with WebCrypto. When the
+// browser has no WebCrypto Ed25519, verifyV2Receipt and
+// verifyEd25519Strict throw Ed25519Unavailable instead of answering. No
+// change to the checks, their order or their failure reasons.
 // Changed in the comments only: the opening paragraph, on the conformance
 // harness that uses the original, is rewritten for this port; the
 // original's sentence on Go's Receipt.UnmarshalJSON, its paragraph on
@@ -24,7 +30,9 @@
 // mention of Python's parse_receipt and Go's ParseReceipt are dropped,
 // since they describe the other verifiers; and the JSDoc @param and
 // @returns tags of parseReceipt and verifyV2Receipt are dropped, since
-// TypeScript states the types.
+// TypeScript states the types; the original's paragraph saying its
+// edwards25519 arithmetic is written out apart from the library's is
+// dropped, since this port uses the library's.
 
 /**
  * The v2 (Ed25519) receipt verifier of the verifiable-receipts conformance
@@ -37,10 +45,12 @@
  *   3. `contentHash`, when present and not null, is a string equal to
  *      the hex SHA-256 of `canonical`'s UTF-8 bytes ("sha256:" prefix
  *      optional); an empty string is a mismatch, not an absent field.
- *   4. The public key is not a point of small order or a non-canonical
- *      encoding (VAOS 2.0 §7.3; checked right after step 2), and the
- *      Ed25519 signature verifies over `canonical`'s UTF-8 bytes,
- *      exactly as given.
+ *   4. The public key is a canonical encoding of a point of order L:
+ *      not of small order, not of mixed order, not off the curve
+ *      (VAOS 2.0 §7.3; checked right after step 2). The signature's R
+ *      is the same, and its S is below L, checked before WebCrypto
+ *      sees it; then the Ed25519 signature verifies over `canonical`'s
+ *      UTF-8 bytes, exactly as given.
  *   5. `canonical` nests at most 64 deep, counted on its text before it
  *      is parsed, and parses as a JSON object.
  *   6. Every other top-level field of the receipt equals the same field
@@ -50,13 +60,14 @@
  * jsonEqual below recurses at most 64 deep, and the depth checks walk an
  * explicit stack, so no input can overflow the call stack.
  */
-import { ed25519Verify, fromBase64, sha256Hex, toHex, utf8 } from "../../bytes.ts";
+import { Ed25519Unavailable, ed25519Verify, fromBase64, isUnsupported, sha256Hex, utf8 } from "../../bytes.ts";
+import { DOES_NOT_VERIFY, ed25519PublicKeyProblem, ed25519SignatureProblem } from "./ed25519-key.ts";
 
 const ENVELOPE_ONLY = new Set(["canonical", "contentHash", "signature"]);
 
 const STANDARD_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
-export const SIGNATURE_MISMATCH_REASON = "signature does not verify under the supplied public key";
+export const SIGNATURE_MISMATCH_REASON = DOES_NOT_VERIFY;
 
 export interface VerifyResult {
   ok: boolean;
@@ -68,42 +79,40 @@ function isObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * The encodings of the points of small order, with the sign bit cleared:
- * the libsodium blocklist ("Taming the many EdDSAs", Chalkias et al.). The
- * last two are the non-canonical encodings y = p and y = p + 1.
- */
-const SMALL_ORDER_KEYS = new Set([
-  "0000000000000000000000000000000000000000000000000000000000000000",
-  "0100000000000000000000000000000000000000000000000000000000000000",
-  "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
-  "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
-  "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-  "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-  "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-]);
-
-/**
- * Why a 32-byte Ed25519 public key is refused (VAOS 2.0 §7.3), or null: a
- * point of small order, or a non-canonical encoding (y of p or more).
- */
-export function weakKeyReason(raw: Uint8Array): string | null {
-  if (raw.length !== 32) return null;
-  const cleared = raw.slice();
-  cleared[31] = (cleared[31] ?? 0) & 0x7f;
-  if (SMALL_ORDER_KEYS.has(toHex(cleared))) return "public key is a small-order point";
-  const y = BigInt("0x" + toHex(cleared.slice().reverse()));
-  if (y >= 2n ** 255n - 19n) return "public key is not a canonical encoding";
-  return null;
-}
-
-/**
- * Why the Ed25519 public key is refused, or null. A key that is not Ed25519
- * is left to the signature check, which fails.
+ * Why the Ed25519 public key is refused (VAOS 2.0 §7.3), or null. A key
+ * that is not Ed25519, or not 32 bytes, is left to the signature check,
+ * which fails.
  */
 async function ed25519KeyProblem(publicKey: CryptoKey): Promise<string | null> {
   if (publicKey.algorithm.name !== "Ed25519") return null;
   if (!publicKey.extractable) throw new TypeError("verifyV2Receipt needs an extractable key, to check it is not weak");
-  return weakKeyReason(new Uint8Array(await crypto.subtle.exportKey("raw", publicKey)));
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", publicKey));
+  return raw.length === 32 ? ed25519PublicKeyProblem(raw) : null;
+}
+
+/**
+ * One Ed25519 signature under the strict profile of VAOS 2.0 §7.3: the
+ * key, then R and S, then WebCrypto's check. `publicKey`, `message` and
+ * `signature` are bytes (the raw key and R || S).
+ */
+export async function verifyEd25519Strict(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): Promise<VerifyResult> {
+  for (const arg of [publicKey, message, signature]) {
+    if (!(arg instanceof Uint8Array)) return { ok: false, reason: DOES_NOT_VERIFY };
+  }
+  const keyProblem = ed25519PublicKeyProblem(publicKey);
+  if (keyProblem) return { ok: false, reason: keyProblem };
+  const sig = new Uint8Array(signature);
+  const sigProblem = ed25519SignatureProblem(sig);
+  if (sigProblem) return { ok: false, reason: sigProblem };
+  let key: CryptoKey;
+  try {
+    key = await crypto.subtle.importKey("raw", new Uint8Array(publicKey), { name: "Ed25519" }, false, ["verify"]);
+  } catch (e) {
+    if (isUnsupported(e)) throw new Ed25519Unavailable();
+    return { ok: false, reason: DOES_NOT_VERIFY };
+  }
+  const ok = await ed25519Verify(key, sig, new Uint8Array(message));
+  return ok ? { ok: true } : { ok: false, reason: DOES_NOT_VERIFY };
 }
 
 /** The nesting limit of VAOS 2.0 §7.2. */
@@ -242,6 +251,9 @@ export async function verifyV2Receipt(receipt: unknown, publicKey: CryptoKey): P
     }
   }
 
+  // VAOS 2.0 §7.3: R and S are checked before WebCrypto sees them.
+  const sigProblem = ed25519SignatureProblem(sigBytes);
+  if (sigProblem) return { ok: false, reason: sigProblem };
   if (!(await ed25519Verify(publicKey, sigBytes, canonicalBytes))) {
     return { ok: false, reason: SIGNATURE_MISMATCH_REASON };
   }

@@ -11,7 +11,8 @@ import type { PublicKey } from "./keys.ts";
 import { logError, type LogClient } from "./log-client.ts";
 import { parseV2Signature, verifyV2Text } from "./signature.ts";
 import { canonicalTreeHead, checkTreeHead, type TreeHeadCheck } from "./tree-head.ts";
-import { MAX_NESTING, jsonEqual, nestsTooDeep, textNestsTooDeep, verifyV2Receipt, weakKeyReason } from "./vendor/verifiable-receipts/receipt.ts";
+import { ed25519PublicKeyProblem, ed25519SignatureProblem } from "./vendor/verifiable-receipts/ed25519-key.ts";
+import { MAX_NESTING, jsonEqual, nestsTooDeep, textNestsTooDeep, verifyV2Receipt } from "./vendor/verifiable-receipts/receipt.ts";
 import { leafHash, verifyInclusionProof } from "./vendor/verifiable-receipts/transparency.ts";
 
 export type Status = "passed" | "failed" | "not-run";
@@ -126,13 +127,20 @@ async function signatureCheck(receipt: unknown, format: CheckResult, keys: reado
   }
   const parsed = parseV2Signature(receipt.signature);
   if (!parsed.ok) return { check: result(id, "not-run", "Not run: the receipt's format is wrong."), key: undefined };
+  // VAOS 2.0 §7.3, strict: the key, then the signature's R and S, before WebCrypto sees either.
+  const sigProblem = ed25519SignatureProblem(parsed.bytes);
   const refused: string[] = [];
   for (const k of keys) {
-    // The verifier refuses a weak key before it verifies anything (VAOS 2.0 §7.3).
-    const weak = k.key.algorithm.name === "Ed25519" ? weakKeyReason(new Uint8Array(await crypto.subtle.exportKey("raw", k.key))) : null;
+    const weak = k.key.algorithm.name === "Ed25519" ? ed25519PublicKeyProblem(new Uint8Array(await crypto.subtle.exportKey("raw", k.key))) : null;
     if (weak !== null) {
       refused.push(`${k.fingerprint} (${weak})`);
       continue;
+    }
+    if (sigProblem?.startsWith("signature R is ")) {
+      return {
+        check: result(id, "failed", `The signature is refused before it is checked (${sigProblem}). Under the strict rule every verifier applies, no honest signer makes such a signature; it was forged or damaged.`),
+        key: undefined,
+      };
     }
     if (await ed25519Verify(k.key, parsed.bytes, utf8(receipt.canonical))) {
       return { check: result(id, "passed", `Signed by the key ${k.fingerprint}.`), key: k.fingerprint };
