@@ -61,7 +61,7 @@ EVIL = Term(
     group="protocol",
 )
 EVIL_PAGE = render_page(*page_term(EVIL), ASSETS)
-PAGES["/terms/evil/"] = EVIL_PAGE
+PAGES["/glossary/evil/"] = EVIL_PAGE
 
 NOINDEX = {"/404.html"}
 
@@ -176,9 +176,9 @@ class PagesTest(unittest.TestCase):
         self.assertEqual(data["@graph"][1]["description"], 'A <script>"& definition.')
 
     def test_the_nav_labels_and_site_name_are_text(self) -> None:
-        nav = [{"label": "<b>&amp;", "path": "/terms/", "key": "terms"}]
+        nav = [{"label": "<b>&amp;", "path": "/glossary/", "key": "glossary"}]
         with mock.patch("app.layout.NAV", nav), mock.patch.dict("app.layout.SITE", {"name": "<i>&amp;"}):
-            p = parse(render_route("/terms/", ASSETS) or "")
+            p = parse(render_route("/glossary/", ASSETS) or "")
         self.assertEqual([t for t, _ in p.tags if t in ("b", "i")], [])
         links = [a for a in p.all("a") if a.get("class") == "brand" or "aria-current" in a]
         self.assertEqual(len(links), 2)
@@ -195,10 +195,10 @@ class PagesTest(unittest.TestCase):
             return [(a["href"], a["aria-current"]) for a in parse(PAGES[route]).all("a") if "aria-current" in a]
 
         self.assertEqual(current("/"), [(f"{BASE}/", "page")])
-        self.assertEqual(current("/terms/"), [(f"{BASE}/terms/", "page")])
-        self.assertEqual(current("/terms/receipt/"), [(f"{BASE}/terms/", "true")])
+        self.assertEqual(current("/glossary/"), [(f"{BASE}/glossary/", "page")])
+        self.assertEqual(current("/glossary/receipt/"), [(f"{BASE}/glossary/", "true")])
         self.assertEqual(current("/404.html"), [])
-        navs = [a.get("aria-label") for a in parse(PAGES["/terms/receipt/"]).all("nav")]
+        navs = [a.get("aria-label") for a in parse(PAGES["/glossary/receipt/"]).all("nav")]
         self.assertEqual(navs, ["Main", "Breadcrumb"])
 
     def test_the_check_page_says_it_needs_javascript_until_the_script_starts(self) -> None:

@@ -179,7 +179,7 @@ function renderCheck(doc: Document, c: CheckResult): HTMLLIElement {
   const head = el(doc, "p", "check-head");
   head.append(el(doc, "span", "check-status", c.network ? "Network error" : STATUS_LABEL[c.status]), " ");
   const name = el(doc, "a", "check-name", info?.name ?? c.id);
-  name.href = `terms/${info?.term ?? ""}/`;
+  name.href = `glossary/${info?.term ?? ""}/`;
   head.append(name);
   li.append(head, el(doc, "p", "check-detail", detailOf(c)));
   if (info !== undefined) {

@@ -25,7 +25,7 @@ async function axe(page: Page): Promise<void> {
 
 test("the sitemap lists the pages", () => {
   expect(LISTED).toContain("/");
-  expect(LISTED).toContain("/terms/receipt/");
+  expect(LISTED).toContain("/glossary/receipt/");
   expect(LISTED).not.toContain("/404.html");
   expect(LISTED.length).toBeGreaterThan(20);
 });
@@ -153,7 +153,7 @@ test.describe("without JavaScript", () => {
   });
 
   test("a term page reads in full", async ({ page }) => {
-    await page.goto("./terms/inclusion-proof/");
+    await page.goto("./glossary/inclusion-proof/");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Inclusion proof");
     await expect(page.locator(".definition")).toContainText("audit path");
   });

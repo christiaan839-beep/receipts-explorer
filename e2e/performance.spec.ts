@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Largest Contentful Paint under 1.5 s on four pages (the check page, how it
-// works, the terms index and one term) on a mid-range phone over fast 3G:
+// works, the glossary and one term) on a mid-range phone over fast 3G:
 // Chrome DevTools' "Fast 3G" network profile (562.5 ms round trip,
 // 1.44 Mbit/s down, 675 kbit/s up) and a CPU four times slower.
 import { expect, test } from "@playwright/test";
 
-const ROUTES = ["./", "./how-it-works/", "./terms/", "./terms/inclusion-proof/"];
+const ROUTES = ["./", "./how-it-works/", "./glossary/", "./glossary/inclusion-proof/"];
 
 test.use({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true });
 

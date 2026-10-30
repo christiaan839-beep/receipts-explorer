@@ -27,7 +27,7 @@ SITE = {
 NAV = [
     {"label": "Check a receipt", "path": "/", "key": "check"},
     {"label": "How it works", "path": "/how-it-works/", "key": "how"},
-    {"label": "Terms", "path": "/terms/", "key": "terms"},
+    {"label": "Glossary", "path": "/glossary/", "key": "glossary"},
 ]
 
 # The seven checks, shared with the script (src/ui.ts imports the same file).

@@ -23,7 +23,7 @@ def plain(fragment: str, limit: int = 155) -> str:
 
 
 def term_link(slug: str, label: str | None = None) -> str:
-    return f'<a href="{url(f"/terms/{slug}/")}">{esc(label or BY_SLUG[slug].name)}</a>'
+    return f'<a href="{url(f"/glossary/{slug}/")}">{esc(label or BY_SLUG[slug].name)}</a>'
 
 
 def file_field(id_: str, label: str, hint: str, file_label: str, rows: int) -> str:
@@ -157,19 +157,19 @@ place in the log, without trusting the agent, its host or the log.</p>
 <ul>{relations}</ul>
 <h2>One name to read carefully</h2>
 {note}
-<p>Every term has its own page: see <a href="{url("/terms/")}">the terms</a>.</p>"""
+<p>Every term has its own page: see <a href="{url("/glossary/")}">the glossary</a>.</p>"""
     return meta, body
 
 
-def page_terms() -> tuple[dict, str]:
+def page_glossary() -> tuple[dict, str]:
     meta = {
-        "path": "/terms/",
-        "title": "Terms: the ontology of verifiable receipts",
+        "path": "/glossary/",
+        "title": "Glossary: the ontology of verifiable receipts",
         "description": "Every term verifiable receipts uses, defined once, with its SCITT (RFC 9943) equivalent where there is one.",
-        "active": "terms",
+        "active": "glossary",
         "schema": {
             "@type": "DefinedTermSet",
-            "@id": absolute("/terms/"),
+            "@id": absolute("/glossary/"),
             "name": "Verifiable receipts ontology",
             "inLanguage": SITE["locale"],
         },
@@ -180,7 +180,7 @@ def page_terms() -> tuple[dict, str]:
     agent = "".join(f"<li>{term_link(t.slug)}</li>" for t in TERMS if t.group == "agent")
     note = "".join(f"<p>{p}</p>" for p in NAME_NOTE)
     intro = "".join(f"<p>{p}</p>" for p in AGENT_INTRO)
-    body = f"""<h1>Terms</h1>
+    body = f"""<h1>Glossary</h1>
 <p class="lede">The terms of verifiable receipts, each defined once, from
 <a href="{SITE["vr_repo"]}/blob/{VR_REF}/docs/ontology.md">docs/ontology.md</a> at commit <code>{VR_REF[:12]}</code>.</p>
 {note}
@@ -194,18 +194,18 @@ def page_terms() -> tuple[dict, str]:
 
 def page_term(term: Term) -> tuple[dict, str]:
     meta = {
-        "path": f"/terms/{term.slug}/",
+        "path": f"/glossary/{term.slug}/",
         "title": f"{term.name}: definition",
         "description": plain(term.definition),
-        "active": "terms",
+        "active": "glossary",
         "schema": {
             "@type": "DefinedTerm",
             "name": term.name,
             "description": plain(term.definition, 1000),
             "inDefinedTermSet": {
                 "@type": "DefinedTermSet",
-                "@id": absolute("/terms/"),
-                "url": absolute("/terms/"),
+                "@id": absolute("/glossary/"),
+                "url": absolute("/glossary/"),
                 "name": "Verifiable receipts ontology",
             },
         },
@@ -217,7 +217,7 @@ def page_term(term: Term) -> tuple[dict, str]:
         names = " and ".join(f"“{esc(c['name'])}”" for c in checks)
         noun = "check" if len(checks) == 1 else "checks"
         used = f'<h2>Checked on this site</h2><p>This term is used by the {names} {noun}. <a href="{url("/")}">Check a receipt</a>.</p>'
-    body = f"""<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{url("/terms/")}">Terms</a></nav>
+    body = f"""<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{url("/glossary/")}">Glossary</a></nav>
 <h1>{esc(term.name)}</h1>
 <p class="definition">{term.definition}</p>
 {scitt}
@@ -236,13 +236,13 @@ def not_found() -> tuple[dict, str]:
         "schema": {"@type": "WebPage", "name": "Page not found"},
     }
     body = f"""<h1>Page not found</h1>
-<p>There is no page at this address. <a href="{url("/")}">Check a receipt</a>, or see the <a href="{url("/terms/")}">terms</a>.</p>"""
+<p>There is no page at this address. <a href="{url("/")}">Check a receipt</a>, or see the <a href="{url("/glossary/")}">glossary</a>.</p>"""
     return meta, body
 
 
-ROUTES = {"/": page_check, "/how-it-works/": page_how, "/terms/": page_terms}
+ROUTES = {"/": page_check, "/how-it-works/": page_how, "/glossary/": page_glossary}
 for _t in TERMS:
-    ROUTES[f"/terms/{_t.slug}/"] = lambda t=_t: page_term(t)
+    ROUTES[f"/glossary/{_t.slug}/"] = lambda t=_t: page_term(t)
 
 
 def render_route(path: str, assets: dict[str, str]) -> str | None:
