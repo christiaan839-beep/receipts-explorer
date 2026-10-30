@@ -1,4 +1,4 @@
 # The Python tools CI installs, by hash. The site itself needs only the
 # standard library. Regenerate requirements.txt after a change here with:
 #   uv pip compile --generate-hashes --python-version 3.12 --exclude-newer <14 days ago> -o requirements.txt requirements.in
-ruff==0.17.0
+ruff==0.17.1
