@@ -1,0 +1,34 @@
+{
+  "name": "receipts-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A page that checks verifiable receipts, and their place in a transparency log, in the browser.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/tsconfig.json",
+    "lint": "eslint .",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "build": "npm run bundle && python3 build.py",
+    "e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && python3 scripts/check_budget.py"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1"
+  },
+  "overrides": {
+    "playwright-core": "1.64.0"
+  }
+}

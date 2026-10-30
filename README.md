@@ -1,0 +1,112 @@
+# receipts-explorer
+
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/christiaan839-beep/receipts-explorer/badge)](https://scorecard.dev/viewer/?uri=github.com/christiaan839-beep/receipts-explorer)
+
+A web page that checks a [verifiable receipt](https://github.com/christiaan839-beep/verifiable-receipts)
+in your browser: that the issuer signed exactly this text, that the receipt
+does not contradict itself, and, given a [receipts-log](https://github.com/christiaan839-beep/receipts-log)
+address, that the receipt is in the log and that witnesses saw the same log.
+
+**<https://verify.sovereignmatrix.co.za/>**
+
+Your receipt is not uploaded. Receipts and keys stay in the browser tab; if
+you give a log address, the page sends that log only GET requests, carrying
+the receipt's leaf hash, never its text.
+
+The log, like any web server, also sees your IP address and when you asked,
+so it can tell that someone at that address looked up that entry. GitHub
+Pages, which serves the page, sees the visit but nothing you paste.
+
+## The seven checks
+
+The page runs these on each receipt. What each proves and does not prove is
+quoted from `content/checks.json`, the same sentences the site shows.
+
+1. **Format**: a v2 receipt, its signature in the one valid spelling.
+   - Proves: "The receipt is a v2 receipt, and its signature is written in the one valid spelling."
+   - Does not prove: "Nothing about who signed it or whether its content is true."
+2. **Signature**: valid under the issuer key you give, named by fingerprint,
+   under the strict Ed25519 rule of VAOS 2.0 section 7.3: a key or a
+   signature's R that is not the canonical encoding of a point of order L,
+   or an S of L or more, is refused before the browser's WebCrypto sees it,
+   so every browser gives the same verdict.
+   - Proves: "The holder of this key signed exactly this text, and nobody changed it afterwards."
+   - Does not prove: "That the key belongs to the issuer you think it does: that depends on where you got the key."
+3. **Content hash**: matches the signed text.
+   - Proves: "The contentHash beside the signed text is the SHA-256 of that text."
+   - Does not prove: "Anything the signature does not already prove; it lets other tools find the receipt by its hash."
+4. **Repeated fields**: each equals the signed text.
+   - Proves: "Every field beside the signed text says the same as the signed text."
+   - Does not prove: "That the action happened as recorded; only that the receipt does not contradict itself."
+5. **Tree head**: the log's latest tree head (`GET /v1/sth`), signed by the
+   log key you give.
+   - Proves: "The log's key signed this tree head: the log committed to this size and root."
+   - Does not prove: "That the log shows everyone the same tree head; witnesses check that."
+6. **In the log**: an inclusion proof for the receipt (`GET /v1/proof/inclusion`,
+   with its leaf hash and the tree size), checked against the signed root,
+   never against a root the log's answer brings with it.
+   - Proves: "The receipt is an entry in the tree the signed tree head commits to, so the log cannot later deny holding it."
+   - Does not prove: "When the action happened, or that the log holds no other receipts that contradict this one."
+7. **Witnesses**: how many of the witness keys you give cosigned a tree head
+   with that log, size and root, at any timestamp (`GET /v1/cosignatures`);
+   it fails when none did. It also fails on a witness-signed fork among the
+   cosignatures the log returns: one over the same log and size with another
+   root, signed by a witness key you gave. A fork cosignature whose text is
+   not canonical, or whose signature does not verify under a key you gave,
+   is skipped. A log that withholds a fork cosignature is not caught here.
+   - Proves: "Independent witnesses saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size."
+   - Does not prove: "That the witnesses are independent of the log; that depends on who runs them."
+
+Each is passed, failed or not run. A check that cannot run is never shown
+as passed, and a network error is never shown as a verdict. The issuer's
+key is required. Without a log address, or without the log's key, checks 5
+to 7 are not run and no log is asked: the page never fetches the log's key
+from the log, because a key fetched from the log proves nothing. Without
+witness keys, Witnesses is not run. Per run, the log is asked for at most one tree head, one list of
+cosignatures (only when you give witness keys) and one inclusion proof per
+receipt, and for nothing after a tree head that fails.
+
+## How it is built
+
+- **Pages**: Python 3 standard library only (`app/content.py`, `app/ontology.py`,
+  `app/layout.py`, `app/pages.py`; `serve.py`; `build.py` writes `dist/`).
+  Python 3.9 or later; CI tests 3.9 and 3.12. Every page reads in full without
+  JavaScript.
+- **Checks**: one TypeScript bundle, `static/check.js` on the site (`npm run
+  bundle` writes it to `build/check.js`), built with esbuild, with no runtime
+  dependencies and WebCrypto's Ed25519. Its verifier is a browser
+  port of verifiable-receipts' at a pinned commit (`third_party/verifiable-receipts/`).
+  The only code that makes requests is `src/log-client.ts`.
+- **Hosting**: GitHub Pages, at the root of its own domain,
+  `verify.sovereignmatrix.co.za`, deployed from `main` by `.github/workflows/deploy.yml`,
+  which runs CI, builds `dist/`, checks the size budget and attests the
+  build provenance of every file before it deploys. A Content Security
+  Policy allows scripts and styles from the site only, no inline code, and
+  connections over https only; in a browser that enforces Trusted Types it
+  also refuses HTML built from strings. The stylesheet and the script carry
+  Subresource Integrity hashes.
+- **Search engines**: the site is at the root of its host, so crawlers read
+  the `robots.txt` that `build.py` writes, and its `Sitemap:` line names
+  <https://verify.sovereignmatrix.co.za/sitemap.xml>. Submitting the sitemap
+  in Google Search Console and Bing Webmaster Tools as well gets it read
+  sooner.
+
+## Run it
+
+```bash
+npm ci
+npm run bundle            # build/check.js
+python3 serve.py          # live render at http://127.0.0.1:8000/
+python3 serve.py --dist   # or the built dist/ (npm run build first), as GitHub Pages serves it
+npm run check             # type check, lint, unit tests, build dist/, size budget
+npx playwright install chromium firefox webkit
+npm run e2e               # Playwright and axe against dist/ (build it first)
+```
+
+`serve.py` listens on 127.0.0.1 and answers only requests addressed to
+127.0.0.1 or localhost, with its port.
+
+## Licence
+
+Apache-2.0. See `LICENSE`, and `third_party/verifiable-receipts/` for the
+vendored code.

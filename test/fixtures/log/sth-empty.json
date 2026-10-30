@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "logId": "stub-log",
+  "treeSize": 0,
+  "rootHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "timestamp": "2026-10-23T12:00:00.000Z",
+  "signature": "v2=BpAIdrGX2nVj835mYeFSv2mVgZvsQBts/9MHLVMamT6LY6NXedyu8X/8uouu7ouUacQVMv7ZbPDZC5HJnr5ZBA==",
+  "canonical": "{\"logId\":\"stub-log\",\"rootHash\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"timestamp\":\"2026-10-23T12:00:00.000Z\",\"treeSize\":0,\"v\":1}"
+}

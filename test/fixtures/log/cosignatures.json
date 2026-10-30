@@ -1,0 +1,85 @@
+{
+  "treeSize": 3,
+  "cosignatures": [
+    {
+      "witnessId": "w1",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T12:00:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=D+eo2PtRV6SGrh4JxLq1Y7C99okeAK6T87VPng3ziPxhZyukc9UTXusEZCAG5aGIo9Rat9edtA0rLdvR2HILDg==",
+      "publicKeyUrl": "https://witness.example/w1.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w2",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T11:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T11:00:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=AQTIpsHVHc5i9/443z4w5apzTIwz7vGbrNp1HUDN/PEfsmBUCiRZc4bNkQGgwri7ZMX28QIwfyupUhbHYdMDAw==",
+      "publicKeyUrl": "https://witness.example/w2.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w3",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T12:00:00.000Z\",\"treeSize\": 3,\"v\":1}",
+      "signature": "v2=gJq70PLXhxOj9c/rd947VDCGIpYxdZCBfSdadBbKkWp6y5bMAbk3JahyC0qU8yDW0RtyP6sqP0QhDzwPZe4VDA==",
+      "publicKeyUrl": "https://witness.example/w3.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w1",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T12:30:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T12:30:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=2lkGUuFN3fKmDkMWP8h4LeZifik4xXQB4f9lQimBkFzOk/vO9IhPdAFUuAcNBTerezotf3pNrlyLk7AUBS1WAw==",
+      "publicKeyUrl": "https://witness.example/w1.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w2",
+      "treeSize": 3,
+      "rootHash": "4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6",
+      "timestamp": "2026-10-23T11:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"4e2ace2704accbf450178da3f8c849d268d52bb9fe340216248ee75c7df2bdb6\",\"timestamp\":\"2026-10-23T11:00:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=AQTIpsHVHc5i9/443z4w5apzTIwz7vGbrNp1HUDN/PEfsmBUCiRZc4bNkQGgwri7ZMX28QIwfyupUhbHYdMDAw==",
+      "publicKeyUrl": "https://witness.example/w2.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w1",
+      "treeSize": 2,
+      "rootHash": "fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339",
+      "timestamp": "2026-10-23T10:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339\",\"timestamp\":\"2026-10-23T10:00:00.000Z\",\"treeSize\":2,\"v\":1}",
+      "signature": "v2=IMA0JPjJPPQ55JUgBV4YIblRAhb7+W9NzRjiJ/m4zS1TOCYQM56+lH2xIE9tgw1BW6iokxQ/ycUnnp7CryA6Bg==",
+      "publicKeyUrl": "https://witness.example/w1.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w2",
+      "treeSize": 3,
+      "rootHash": "fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339",
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "sthCanonical": "{\"logId\":\"another-log\",\"rootHash\":\"fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339\",\"timestamp\":\"2026-10-23T12:00:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=zB0Ed7oMgk+cdnCl66Yrs/mPocYRdxzBOW0LG51zZPSZFcuYRdRzjxQientkxLEskUjvYrZWxR7dYgY2849sCg==",
+      "publicKeyUrl": "https://witness.example/w2.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    },
+    {
+      "witnessId": "w3",
+      "treeSize": 3,
+      "rootHash": "fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339",
+      "timestamp": "2026-10-23T11:30:00.000Z",
+      "sthCanonical": "{\"logId\":\"stub-log\",\"rootHash\":\"fa09f0b8ef225dd621639b825c128669b117290a83460ab15bc0695d53752339\",\"timestamp\":\"2026-10-23T11:30:00.000Z\",\"treeSize\":3,\"v\":1}",
+      "signature": "v2=dKQXp+oFHcHMcgG/ZFxzjvVCh9NP1gNGuV/os1IZsQ4hwXzWTSmkew4uqew0389ZjEPcNPKd/gFP3GBtzjXEBA==",
+      "publicKeyUrl": "https://witness.example/w3.pem",
+      "receivedAt": "2026-10-23T12:00:05.000Z"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "receipts-explorer: dev server (live render)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["serve.py", "8000"],
+      "port": 8000,
+      "url": "http://127.0.0.1:8000"
+    },
+    {
+      "name": "receipts-explorer: built site (dist)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["serve.py", "--dist", "8080"],
+      "port": 8080,
+      "url": "http://127.0.0.1:8080"
+    }
+  ]
+}

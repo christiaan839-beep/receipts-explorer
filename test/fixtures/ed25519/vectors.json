@@ -1,0 +1,145 @@
+[
+ {
+  "name": "valid",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "9d1d0a20667254c45d858fbc0249efe4ab9b69e3b4876137e32127f1ff1b956d558ff6f7388f59a159bd81f81b0f47e24795c06de168bbf26679a584bf17af02",
+  "note": "control: honest signature",
+  "strict": true
+ },
+ {
+  "name": "S + L (non-canonical S, malleated)",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "9d1d0a20667254c45d858fbc0249efe4ab9b69e3b4876137e32127f1ff1b956d4263ec5453f26bf92f5a799bfa0826f74795c06de168bbf26679a584bf17af12",
+  "note": "RFC 8032 requires S < L",
+  "strict": false,
+  "reason": "signature does not verify under the supplied public key"
+ },
+ {
+  "name": "S + 2^253? (S + 2L)",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "9d1d0a20667254c45d858fbc0249efe4ab9b69e3b4876137e32127f1ff1b956d2f37e2b16d557e5106f7703ed902050c4895c06de168bbf26679a584bf17af22",
+  "note": "S < 2^256 but >= L",
+  "strict": false,
+  "reason": "signature does not verify under the supplied public key"
+ },
+ {
+  "name": "S = L, R = A? (S >= L, high)",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "9d1d0a20667254c45d858fbc0249efe4ab9b69e3b4876137e32127f1ff1b956dedd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
+  "note": "S == L",
+  "strict": false,
+  "reason": "signature does not verify under the supplied public key"
+ },
+ {
+  "name": "identity key, R=identity, S=0",
+  "spki": "MCowBQYDK2VwAyEAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "note": "small-order A; any message",
+  "strict": false,
+  "reason": "public key is a small-order point"
+ },
+ {
+  "name": "identity key non-canonical (y=p+1), R=identity, S=0",
+  "spki": "MCowBQYDK2VwAyEA7v///////////////////////////////////////38=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "note": "non-canonical A",
+  "strict": false,
+  "reason": "public key is a small-order point"
+ },
+ {
+  "name": "order-8 key, R=id, S=0, k%8==0",
+  "spki": "MCowBQYDK2VwAyEAxxdqcD1N2E+6PAt2DRBnDyogU/osOczGTsf9d5KsA3o=",
+  "msg": "6d30",
+  "sig": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "note": "small-order A; cofactorless equation holds",
+  "strict": false,
+  "reason": "public key is a small-order point"
+ },
+ {
+  "name": "order-8 key, R=id, S=0, k%8!=0",
+  "spki": "MCowBQYDK2VwAyEAxxdqcD1N2E+6PAt2DRBnDyogU/osOczGTsf9d5KsA3o=",
+  "msg": "6d31",
+  "sig": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "note": "only a cofactored verifier accepts",
+  "strict": false,
+  "reason": "public key is a small-order point"
+ },
+ {
+  "name": "mixed-order key, k%8!=0",
+  "spki": "MCowBQYDK2VwAyEAsl7spz7lQ9uOAuuVYeuJDmOh6yGIUFxlVRfwXfIagtk=",
+  "msg": "6d6978656430",
+  "sig": "3ed5d07abad42205859d256bdea158d937dfeeaa66926d62b995df851f834074d7cb403df9489682dbf50cf491e180cd033c4979cca502b46206b2aa06c66103",
+  "note": "only a cofactored verifier accepts",
+  "strict": false,
+  "reason": "public key is not in the prime-order subgroup"
+ },
+ {
+  "name": "mixed-order key, k%8==0",
+  "spki": "MCowBQYDK2VwAyEAsl7spz7lQ9uOAuuVYeuJDmOh6yGIUFxlVRfwXfIagtk=",
+  "msg": "6d6978656434",
+  "sig": "ea2c6fa9a7333adaa12570c9a863d1a3203c4ae58ec2f413c55ec8ded59e877c0c1f39806f490738f4e676fcd7e28be9dd5aed21f78852eeb0c363c96135fe00",
+  "note": "cofactorless and cofactored both accept",
+  "strict": false,
+  "reason": "public key is not in the prime-order subgroup"
+ },
+ {
+  "name": "small-order R (T8), S=k*a",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "736d616c6c52",
+  "sig": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a5ec4b25a45e5b9d3bf30ee092c5d2689b2c8c244ba195402d22af61f2fa72607",
+  "note": "only a cofactored verifier accepts",
+  "strict": false,
+  "reason": "signature R is a small-order point"
+ },
+ {
+  "name": "R = identity, S=k*a",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "696452",
+  "sig": "01000000000000000000000000000000000000000000000000000000000000006a32cbc94f44e00b1e0dace30a1199b8747f552801a684960a2caf236ab99404",
+  "note": "R small order (order 1); cofactorless equation holds",
+  "strict": false,
+  "reason": "signature R is a small-order point"
+ },
+ {
+  "name": "non-canonical R (identity as y=p+1)",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "6e6352",
+  "sig": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fb905fb88b7c989b2813b2e73544d60c69076070d1be42dc634fc5ce41d82db00",
+  "note": "equation holds after reducing R",
+  "strict": false,
+  "reason": "signature R is not a canonical encoding"
+ },
+ {
+  "name": "identity key with sign bit (01..80), R=id, S=0",
+  "spki": "MCowBQYDK2VwAyEAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "note": "non-canonical A (x=0, sign 1)",
+  "strict": false,
+  "reason": "public key is a small-order point"
+ },
+ {
+  "name": "key not on curve (02 00..)",
+  "spki": "MCowBQYDK2VwAyEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "9d1d0a20667254c45d858fbc0249efe4ab9b69e3b4876137e32127f1ff1b956d558ff6f7388f59a159bd81f81b0f47e24795c06de168bbf26679a584bf17af02",
+  "note": "invalid point",
+  "strict": false,
+  "reason": "public key is not a point on the curve"
+ },
+ {
+  "name": "R not on curve",
+  "spki": "MCowBQYDK2VwAyEAJ5jX/XQtzxpU+/rXT+hhohqMDO8XoEoNfXF4xcul09Y=",
+  "msg": "726563656970742063616e6f6e6963616c",
+  "sig": "0200000000000000000000000000000000000000000000000000000000000000558ff6f7388f59a159bd81f81b0f47e24795c06de168bbf26679a584bf17af02",
+  "note": "invalid R",
+  "strict": false,
+  "reason": "signature R is not a point on the curve"
+ }
+]

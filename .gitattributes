@@ -1,0 +1,4 @@
+# Vendored and fixture files are compared byte for byte with verifiable-receipts:
+# git must never convert their line endings.
+test/fixtures/** -text
+third_party/** -text
