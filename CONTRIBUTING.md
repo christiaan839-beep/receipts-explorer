@@ -15,13 +15,14 @@ verifiable receipts in the browser.
    review conversation must be resolved before it merges; `main` takes merge
    commits only.
 2. `src/vendor/verifiable-receipts/` is a browser port of the verifiable-receipts
-   verifier. Change the verifier there first; then move
+   verifier. Change the verifier in verifiable-receipts first; then move
    `third_party/verifiable-receipts/VR_REF` to the new commit, copy the files
    `third_party/verifiable-receipts/README.md` lists, bring the port up to date,
    and rewrite `SHA256SUMS`. The `vendor` job checks every copy against `VR_REF`.
 3. The page sends nothing anywhere but the log address the visitor types, stores
    nothing, never parses input as HTML and loads no code at run time. ESLint
-   enforces this in `src/`; keep it so.
+   bans the APIs that would break this in `src/` (`fetch` outside
+   `src/log-client.ts`, storage, HTML parsing, `import()`); keep it so.
 
 ## The checks CI runs
 
@@ -33,9 +34,10 @@ npm ci
 npm run check                                   # tsc, eslint, node --test, build, budget
 npm audit --audit-level=moderate
 python3 -m unittest discover -s tests -t .      # the Python site (test_serve.py binds a local port)
-python3 -m pip install --require-hashes --no-deps -r .github/tools/python-ci/requirements.txt   # in a venv
+python3 -m venv .venv && . .venv/bin/activate     # .venv/ is git-ignored
+python3 -m pip install --require-hashes --no-deps -r .github/tools/python-ci/requirements.txt
 ruff check . && ruff format --check .           # ruff 0.17.0, installed by hash on the line above
-npx playwright install chromium firefox webkit
+npx playwright install chromium firefox webkit   # on Linux: install --with-deps, as CI does
 npx playwright test                             # against dist/, which npm run check builds
 E2E_PORT=4174 npx playwright test               # another port, to run beside a run on 4173
 bash scripts/check-vendor.sh <verifiable-receipts checkout at VR_REF>
@@ -45,7 +47,8 @@ CI runs the unit and property tests with `FC_NUM_RUNS=2000` (2,000 cases per
 property), on Node 22 and 24. The `vendor` job also checks that `VR_REF` is on
 verifiable-receipts' `main`. Separate workflows run CodeQL (`codeql.yml`) and
 zizmor (`zizmor.yml`) on every pull request, and OpenSSF Scorecard
-(`scorecard.yml`) on `main` and weekly. To audit the workflows locally:
+(`scorecard.yml`) on `main` and weekly. To audit the workflows locally
+(needs [uv](https://docs.astral.sh/uv/)):
 
 ```bash
 uvx zizmor@1.30.1 --persona pedantic .github/

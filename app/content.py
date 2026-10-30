@@ -61,6 +61,9 @@ PRIVACY = [
     "Your receipt is not uploaded; receipts and keys stay in this tab.",
     "If you give a log address, the page sends only GET requests, and only to that address. "
     "The log learns the leaf hash of each receipt you look up, never its text.",
+    "The log, like any web server, also sees your IP address and when you asked, so it can tell "
+    "that someone at that address looked up that entry. GitHub Pages, which serves this page, "
+    "sees the visit but nothing you paste.",
     "No cookies, no storage, no analytics. Nothing you type goes in the address bar.",
     "The page's script is checked by its hash before it runs, and every release is attested.",
 ]

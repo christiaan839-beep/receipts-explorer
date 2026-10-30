@@ -13,6 +13,10 @@ Your receipt is not uploaded. Receipts and keys stay in the browser tab; if
 you give a log address, the page sends that log only GET requests, carrying
 the receipt's leaf hash, never its text.
 
+The log, like any web server, also sees your IP address and when you asked,
+so it can tell that someone at that address looked up that entry. GitHub
+Pages, which serves the page, sees the visit but nothing you paste.
+
 ## The seven checks
 
 The page runs these on each receipt. What each proves and does not prove is
@@ -40,11 +44,12 @@ quoted from `content/checks.json`, the same sentences the site shows.
    - Proves: "The receipt is an entry in the tree the signed tree head commits to, so the log cannot later deny holding it."
    - Does not prove: "When the action happened, or that the log holds no other receipts that contradict this one."
 7. **Witnesses**: how many of the witness keys you give cosigned a tree head
-   with that log, size and root, at any timestamp (`GET /v1/cosignatures`).
-   It fails on a witness-signed fork: a cosignature over the same log and
-   size with another root, signed by a witness key you gave. A fork
-   cosignature whose text is not canonical, or whose signature does not
-   verify under a key you gave, is skipped.
+   with that log, size and root, at any timestamp (`GET /v1/cosignatures`);
+   it fails when none did. It also fails on a witness-signed fork among the
+   cosignatures the log returns: one over the same log and size with another
+   root, signed by a witness key you gave. A fork cosignature whose text is
+   not canonical, or whose signature does not verify under a key you gave,
+   is skipped. A log that withholds a fork cosignature is not caught here.
    - Proves: "Independent witnesses saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size."
    - Does not prove: "That the witnesses are independent of the log; that depends on who runs them."
 
@@ -53,8 +58,9 @@ as passed, and a network error is never shown as a verdict. The issuer's
 key is required. Without a log address, or without the log's key, checks 5
 to 7 are not run and no log is asked: the page never fetches the log's key
 from the log, because a key fetched from the log proves nothing. Without
-witness keys, Witnesses is not run. Per run, the log is asked for one tree
-head and one list of cosignatures, and for one inclusion proof per receipt.
+witness keys, Witnesses is not run. Per run, the log is asked for at most one tree head, one list of
+cosignatures (only when you give witness keys) and one inclusion proof per
+receipt, and for nothing after a tree head that fails.
 
 ## How it is built
 
@@ -62,8 +68,9 @@ head and one list of cosignatures, and for one inclusion proof per receipt.
   `app/layout.py`, `app/pages.py`; `serve.py`; `build.py` writes `dist/`).
   Python 3.9 or later; CI tests 3.9 and 3.12. Every page reads in full without
   JavaScript.
-- **Checks**: one TypeScript bundle, `static/check.js`, built with esbuild, with
-  no runtime dependencies and WebCrypto's Ed25519. Its verifier is a browser
+- **Checks**: one TypeScript bundle, `static/check.js` on the site (`npm run
+  bundle` writes it to `build/check.js`), built with esbuild, with no runtime
+  dependencies and WebCrypto's Ed25519. Its verifier is a browser
   port of verifiable-receipts' at a pinned commit (`third_party/verifiable-receipts/`).
   The only code that makes requests is `src/log-client.ts`.
 - **Hosting**: GitHub Pages, deployed from `main` by `.github/workflows/deploy.yml`,
@@ -84,7 +91,7 @@ head and one list of cosignatures, and for one inclusion proof per receipt.
 npm ci
 npm run bundle            # build/check.js
 python3 serve.py          # live render at http://127.0.0.1:8000/receipts-explorer/
-python3 serve.py --dist   # or the built dist/, as GitHub Pages serves it
+python3 serve.py --dist   # or the built dist/ (npm run build first), as GitHub Pages serves it
 npm run check             # type check, lint, unit tests, build dist/, size budget
 npx playwright install chromium firefox webkit
 npm run e2e               # Playwright and axe against dist/ (build it first)

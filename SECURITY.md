@@ -45,15 +45,19 @@ site cannot show the page's verdicts as its own.
 The site is served from `christiaan839-beep.github.io`, an origin it shares
 with every other GitHub Pages project site of that account. The browser
 treats them as one origin: a script on one of those sites could, for
-example, reach into this page in a window it opened. The page stores
-nothing, so no visitor data waits on that origin. A custom domain would
-give the site an origin of its own.
+example, reach into this page in a window it opened, and a service
+worker served from the origin's root (the account's user site,
+`christiaan839-beep.github.io` itself) could answer this page's
+requests. The page stores nothing, so no visitor data waits on that
+origin. A custom domain would give the site an origin of its own.
 
 ## Browsers
 
-The page is tested in Chromium, Firefox and WebKit (Safari's engine), at
-the versions Playwright 1.64.0 ships: Chromium 156, Firefox 157 and
-WebKit 27.2. Those three engines are the supported browsers.
+The supported browsers are current releases of Chrome, Edge, Firefox and
+Safari, which run on the Chromium, Firefox and WebKit engines. CI tests
+those engines at the versions Playwright 1.64.0 ships: Chromium 156,
+Firefox 157 and WebKit 27.2 (Playwright's WebKit build, not Safari
+itself).
 
 Before it checks anything, the page tests the browser's WebCrypto Ed25519
 (`src/ed25519-support.ts`): RFC 8032 section 7.1 test 2, a one-byte message,
@@ -62,7 +66,8 @@ with the key imported both raw and as SPKI. A browser that fails is told
 so, and the page runs no checks. The test does not use RFC 8032 test 1, the
 empty message: WebKit 27.2 answers false to it where Node answers true. The
 page never asks WebCrypto about an empty message: a receipt whose canonical
-text is empty fails Format before any signature is checked.
+text is empty fails Format before any signature is checked, and tree heads
+and cosignatures are verified over their JSON text, which is never empty.
 
 Firefox 157 and WebKit 27.2 also differ from Node on two of the Ed25519
 edge vectors (`test/fixtures/ed25519/`), both identity keys: the
