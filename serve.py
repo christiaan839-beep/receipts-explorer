@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.assets import SCRIPT, hashes  # noqa: E402
 from app.content import SITE  # noqa: E402
-from app.pages import render_not_found, render_route  # noqa: E402
+from app.pages import all_routes, render_not_found, render_route  # noqa: E402
 from build import DIST, robots, sitemap  # noqa: E402
 
 BASE = SITE["base_path"]
@@ -102,14 +102,29 @@ class Handler(BaseHTTPRequestHandler):
             return self._not_found()
         rel = path[len(BASE) + 1 :]
         if rel and not rel.endswith("/") and "." not in posixpath.basename(rel):
-            if self._find(rel + "/") is None:
+            # The Location is the site's own spelling of a page it has, looked
+            # up by the request path, never the request path itself.
+            location = self._redirects().get(path)
+            if location is None or self._find(rel + "/") is None:
                 return self._not_found()
-            return self._send("", status=301, location=quote(path) + "/")
+            return self._send("", status=301, location=location)
         found = self._find(rel)
         if found is None:
             return self._not_found()
         body, ctype = found
         return self._send(body, ctype=ctype)
+
+    def _redirects(self) -> dict[str, str]:
+        """Each page's path without its final slash, mapped to its URL with one.
+
+        The pages are the routes (live), or the directories of dist/ that hold an index.html.
+        """
+        if self.dist:
+            root = self.dist_dir.resolve()
+            dirs = [p.parent.relative_to(root).as_posix() for p in root.rglob("index.html") if p.parent != root]
+        else:
+            dirs = [r.strip("/") for r in all_routes() if r != "/"]
+        return {f"{BASE}/{d}": quote(f"{BASE}/{d}/") for d in dirs if not any(part.startswith(".") for part in d.split("/"))}
 
     def _find(self, rel: str) -> tuple[bytes | str, str] | None:
         """The body and type of the file or page at `rel` (under the base path), or None."""

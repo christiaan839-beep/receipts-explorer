@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 import serve
+from app.pages import all_routes
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -132,6 +133,13 @@ class ServeTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIsNone(headers.get("Location"))
         self.assertIn(b"<h1>Check a receipt</h1>", body)
+
+    def test_every_page_without_its_slash_redirects_to_the_page(self) -> None:
+        for route in all_routes():
+            if route == "/":
+                continue
+            status, headers, _ = self.server.get(route.rstrip("/"))
+            self.assertEqual((status, headers.get("Location")), (301, route), route)
 
     def test_a_missing_path_is_not_found_rather_than_redirected(self) -> None:
         for path in (
@@ -257,7 +265,7 @@ class DistServeTest(ServeTests):
         # A file beside the built site, which must stay out of reach.
         (Path(cls.tmp.name) / ".env").write_text("SECRET=1\n", encoding="utf-8")
         # Pages only this build has: one whose name needs quoting in a Location, one whose name would split headers.
-        for name in ("a b", "x\r\nSet-Cookie: a=b"):
+        for name in ("a b", "x\r\nSet-Cookie: a=b", ".hidden-page"):
             (cls.out / name).mkdir()
             (cls.out / name / "index.html").write_text("<!doctype html><title>t</title>\n", encoding="utf-8")
         with (cls.out / "404.html").open("a", encoding="utf-8") as f:
@@ -280,6 +288,12 @@ class DistServeTest(ServeTests):
         self.assertEqual((status, headers.get("Location")), (301, "/a%20b/"))
         status, _, _ = self.server.get("/a%20b/")
         self.assertEqual(status, 200)
+
+    def test_a_hidden_directory_is_not_redirected_to(self) -> None:
+        self.assertTrue((self.out / ".hidden-page" / "index.html").is_file())
+        status, headers, _ = self.server.get("/.hidden-page")
+        self.assertEqual(status, 404)
+        self.assertIsNone(headers.get("Location"))
 
     def test_a_path_with_a_line_break_is_not_found_even_where_a_page_has_that_name(self) -> None:
         for path in ("/x%0d%0aSet-Cookie:%20a=b", "/x%0d%0aSet-Cookie:%20a=b/"):
