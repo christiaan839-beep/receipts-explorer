@@ -67,9 +67,16 @@ jobs:
       - run: npm run bundle
 
   site:
-    name: Site (Python 3.12)
+    name: Site (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the oldest Python the site supports (pyproject.toml); 3.12
+        # is the one CI otherwise pins. The build and the tests run on both;
+        # ruff and the budget give the same answer on either, so run once.
+        python: ["3.9", "3.12"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,14 +86,18 @@ jobs:
           node-version: 24
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
-      - run: python -m pip install --require-hashes --no-deps -r .github/tools/python-ci/requirements.txt
-      - run: ruff check .
-      - run: ruff format --check .
+          python-version: ${{ matrix.python }}
+      - if: matrix.python == '3.12'
+        run: python -m pip install --require-hashes --no-deps -r .github/tools/python-ci/requirements.txt
+      - if: matrix.python == '3.12'
+        run: ruff check .
+      - if: matrix.python == '3.12'
+        run: ruff format --check .
       - run: npm ci
       - run: npm run build
       - run: python -m unittest discover -s tests -t .
-      - name: The script is under 40 KB compressed, and the pages and styles within budget
+      - if: matrix.python == '3.12'
+        name: The script is under 40 KB compressed, and the pages and styles within budget
         run: python scripts/check_budget.py dist
 
   e2e:

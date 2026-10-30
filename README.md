@@ -60,7 +60,7 @@ head and one list of cosignatures, and for one inclusion proof per receipt.
 
 - **Pages**: Python 3 standard library only (`app/content.py`, `app/ontology.py`,
   `app/layout.py`, `app/pages.py`; `serve.py`; `build.py` writes `dist/`).
-  Python 3.9 or later; CI uses 3.12. Every page reads in full without
+  Python 3.9 or later; CI tests 3.9 and 3.12. Every page reads in full without
   JavaScript.
 - **Checks**: one TypeScript bundle, `static/check.js`, built with esbuild, with
   no runtime dependencies and WebCrypto's Ed25519. Its verifier is a browser

@@ -26,7 +26,7 @@ verifiable receipts in the browser.
 ## The checks CI runs
 
 `.github/workflows/ci.yml` runs these on every push and pull request. Run
-them locally with Node 22.18 or later and Python 3.9 or later (CI uses 3.12):
+them locally with Node 22.18 or later and Python 3.9 or later (CI tests 3.9 and 3.12):
 
 ```bash
 npm ci

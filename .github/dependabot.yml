@@ -24,6 +24,10 @@ updates:
       # The types follow the oldest Node the tests support (engines).
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # typescript-eslint 8 accepts TypeScript below 6.1 only (its peer
+      # range); raise this when typescript-eslint does.
+      - dependency-name: "typescript"
+        versions: [">= 6.1.0"]
     groups:
       npm-development:
         dependency-type: development
