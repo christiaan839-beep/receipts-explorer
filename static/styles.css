@@ -54,8 +54,10 @@ h3 { font-size: 1.1rem; margin: 1rem 0 0.25rem; }
 .lede { font-size: 1.1rem; color: var(--muted); }
 .notice, .problems { border: 2px solid var(--fail); padding: 0.75rem var(--space); border-radius: 6px; }
 .problems h2 { margin-top: 0; font-size: 1.1rem; }
-.check-form { display: grid; gap: 1.25rem; margin: 1.5rem 0; }
-.field { display: grid; gap: 0.3rem; }
+/* minmax(0, 1fr): a control wider than the column (WebKit on Linux draws the
+   file input wider than 288 px) is held to the column, never widens the page. */
+.check-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; margin: 1.5rem 0; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
 label { font-weight: 600; }
 .hint { margin: 0; color: var(--muted); font-size: 0.95rem; }
 /* 1rem, at least 16px, so that iOS does not zoom in on a field it focuses. */
@@ -64,7 +66,7 @@ textarea[aria-invalid="true"], input[aria-invalid="true"] { border: 2px solid va
 .file-label { font-weight: 400; font-size: 0.95rem; }
 input[type="file"] { max-width: 100%; }
 .optional { border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem var(--space); }
-.optional[open] { display: grid; gap: 1.25rem; }
+.optional[open] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
 summary { cursor: pointer; font-weight: 600; }
 .button { justify-self: start; font: inherit; font-weight: 700; color: #fff; background: var(--link); border: 0; border-radius: 6px; padding: 0.65rem 1.4rem; cursor: pointer; min-height: 44px; }
 @media (prefers-color-scheme: dark) { .button { color: #0b1a15; } }
