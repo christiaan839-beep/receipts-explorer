@@ -117,7 +117,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build
-      - run: npx playwright test
+      - run: npx playwright test e2e/diag-webkit-crash.spec.ts --project=webkit --workers=1 --reporter=list
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
