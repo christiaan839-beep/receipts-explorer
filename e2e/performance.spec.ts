@@ -1,9 +1,10 @@
 // Copyright 2026 Christiaan de Wet / Sovereign Matrix
 // SPDX-License-Identifier: Apache-2.0
 
-// Largest Contentful Paint of every page under 1.5 s on a mid-range phone
-// over fast 3G: Chrome DevTools' "Fast 3G" network profile (562.5 ms
-// round trip, 1.44 Mbit/s down, 675 kbit/s up) and a CPU four times slower.
+// Largest Contentful Paint under 1.5 s on four pages (the check page, how it
+// works, the terms index and one term) on a mid-range phone over fast 3G:
+// Chrome DevTools' "Fast 3G" network profile (562.5 ms round trip,
+// 1.44 Mbit/s down, 675 kbit/s up) and a CPU four times slower.
 import { expect, test } from "@playwright/test";
 
 const ROUTES = ["./", "./how-it-works/", "./terms/", "./terms/inclusion-proof/"];

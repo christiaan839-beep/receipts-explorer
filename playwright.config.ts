@@ -6,7 +6,9 @@
 // stubbed with page.route, so no test reaches a live log.
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 4173;
+// E2E_PORT lets two runs share a machine; each starts its own server and
+// never reuses one, so a run always tests its own dist/.
+const PORT = Number(process.env.E2E_PORT ?? 4173);
 
 export default defineConfig({
   testDir: "e2e",
@@ -18,7 +20,7 @@ export default defineConfig({
   webServer: {
     command: `python3 serve.py --dist ${String(PORT)}`,
     url: `http://127.0.0.1:${String(PORT)}/receipts-explorer/`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

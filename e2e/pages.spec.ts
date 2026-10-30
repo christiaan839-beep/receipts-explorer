@@ -13,7 +13,9 @@ import { HONEST, VALID, fill, stubLog } from "./helpers.ts";
 
 const BASE = "/receipts-explorer";
 const SITEMAP = readFileSync(new URL("../dist/sitemap.xml", import.meta.url), "utf8");
-const ROUTES = [...SITEMAP.matchAll(/<loc>[^<]*?\/receipts-explorer(\/[^<]*)<\/loc>/g)].map((m) => m[1] ?? "/");
+const LISTED = [...SITEMAP.matchAll(/<loc>[^<]*?\/receipts-explorer(\/[^<]*)<\/loc>/g)].map((m) => m[1] ?? "/");
+// Every page in the sitemap, and the 404 page, which is not listed in it.
+const ROUTES = [...LISTED, "/404.html"];
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 async function axe(page: Page): Promise<void> {
@@ -22,24 +24,26 @@ async function axe(page: Page): Promise<void> {
 }
 
 test("the sitemap lists the pages", () => {
-  expect(ROUTES).toContain("/");
-  expect(ROUTES).toContain("/terms/receipt/");
-  expect(ROUTES.length).toBeGreaterThan(20);
+  expect(LISTED).toContain("/");
+  expect(LISTED).toContain("/terms/receipt/");
+  expect(LISTED).not.toContain("/404.html");
+  expect(LISTED.length).toBeGreaterThan(20);
 });
 
 for (const scheme of ["light", "dark"] as const) {
   test.describe(`${scheme} mode`, () => {
     test.use({ colorScheme: scheme });
 
-    test("every page passes axe and has no horizontal scroll at 320 px", async ({ page }) => {
-      await page.setViewportSize({ width: 320, height: 640 });
-      for (const route of ROUTES) {
+    // One test per page, so each has the whole timeout to itself.
+    for (const route of ROUTES) {
+      test(`${route} passes axe and has no horizontal scroll at 320 px`, async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
         await page.goto(`.${route}`);
         await axe(page);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        expect(overflow, route).toBeLessThanOrEqual(0);
-      }
-    });
+        expect(overflow).toBeLessThanOrEqual(0);
+      });
+    }
 
     test("the results pass axe too", async ({ page }) => {
       await stubLog(page, { ...HONEST, "/v1/proof/inclusion": "unreachable" });
@@ -52,34 +56,75 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-test("no page breaks its Content Security Policy, inline script does not run, and script from a string is refused", async ({ page, browserName }) => {
+interface Watched {
+  violations: string[];
+  inlineRan?: string[];
+}
+const violations = (page: Page): Promise<string[]> => page.evaluate(() => (window as unknown as Watched).violations);
+// Let a violation reported by the work just done reach the listener.
+const tick = (page: Page): Promise<void> => page.evaluate(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+test("no page breaks its Content Security Policy, and script that is not the page's own never runs", async ({ page }) => {
   await page.addInitScript(() => {
-    (window as unknown as { violations: string[] }).violations = [];
+    (window as unknown as Watched).violations = [];
     document.addEventListener("securitypolicyviolation", (e) => {
-      (window as unknown as { violations: string[] }).violations.push(`${e.violatedDirective} ${e.blockedURI}`);
+      (window as unknown as Watched).violations.push(`${e.violatedDirective} ${e.blockedURI}`);
     });
   });
   for (const route of ROUTES) {
     await page.goto(`.${route}`);
-    expect(await page.evaluate(() => (window as unknown as { violations: string[] }).violations), route).toEqual([]);
+    if (route === "/") await expect(page.locator("#check-form")).toBeVisible();
+    await tick(page);
+    expect(await violations(page), route).toEqual([]);
   }
+  // A results render breaks nothing either.
+  await stubLog(page, HONEST);
+  await page.goto("./");
+  await fill(page, VALID, { log: true });
+  await page.getByRole("button", { name: "Check" }).click();
+  await expect(page.getByRole("status")).toHaveText("Checked 1 receipt: 1 valid.");
+  await tick(page);
+  expect(await violations(page), "after a results render").toEqual([]);
+
   const got = await page.evaluate(async () => {
-    // A text node, not a string assignment, so the script reaches script-src.
-    const s = document.createElement("script");
-    s.append(document.createTextNode("window.inlineRan = true"));
-    document.body.append(s);
-    let assigned = true;
-    try {
-      document.createElement("script").textContent = "window.inlineRan = true";
-    } catch {
-      assigned = false;
-    }
+    const w = window as unknown as Watched;
+    w.inlineRan = [];
+    // require-trusted-types-for 'script': script text from a string, or HTML
+    // from a string, is refused at the sink.
+    const refused = (f: () => void): boolean => {
+      try {
+        f();
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    const textRefused = refused(() => {
+      document.createElement("script").textContent = "window.inlineRan.push('string')";
+    });
+    const htmlRefused = refused(() => {
+      document.createElement("div").innerHTML = "<b>x</b>";
+    });
+    // Script text from a text node: Trusted Types refuses it before script-src sees it.
+    const fromNode = document.createElement("script");
+    fromNode.append(document.createTextNode("window.inlineRan.push('text node')"));
+    document.body.append(fromNode);
+    // Script text from a Trusted Types policy passes Trusted Types, so only
+    // script-src 'self' stands between it and running.
+    const policy = (window as unknown as { trustedTypes: { createPolicy(n: string, r: { createScript(s: string): string }): { createScript(s: string): string } } }).trustedTypes.createPolicy("t", { createScript: (x) => x });
+    const fromPolicy = document.createElement("script");
+    fromPolicy.text = policy.createScript("window.inlineRan.push('policy')");
+    document.body.append(fromPolicy);
     await new Promise((r) => setTimeout(r, 50));
-    return { ran: (window as unknown as { inlineRan?: boolean }).inlineRan === true, assigned };
+    return { ran: w.inlineRan, textRefused, htmlRefused };
   });
-  expect(got.ran).toBe(false);
-  // require-trusted-types-for 'script': Chromium refuses script text from a string.
-  if (browserName === "chromium") expect(got.assigned).toBe(false);
+  expect(got.ran).toEqual([]);
+  expect(got.textRefused).toBe(true);
+  expect(got.htmlRefused).toBe(true);
+  const seen = await violations(page);
+  // The listener works (Trusted Types reported), and script-src itself refused the policy's script.
+  expect(seen.some((v) => v.startsWith("require-trusted-types-for "))).toBe(true);
+  expect(seen.some((v) => v.startsWith("script-src-elem "))).toBe(true);
 });
 
 test("a changed script is refused by its integrity hash: the form stays hidden, and the page says checking needs JavaScript", async ({ page }) => {

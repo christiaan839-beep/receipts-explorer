@@ -37,6 +37,7 @@ python3 -m pip install --require-hashes --no-deps -r .github/tools/python-ci/req
 ruff check . && ruff format --check .           # ruff 0.17.0, installed by hash on the line above
 npx playwright install chromium firefox webkit
 npx playwright test                             # against dist/, which npm run check builds
+E2E_PORT=4174 npx playwright test               # another port, to run beside a run on 4173
 bash scripts/check-vendor.sh <verifiable-receipts checkout at VR_REF>
 ```
 

@@ -248,6 +248,23 @@ test("a log whose tree head is not found (404): the heading and status say the l
   expect(await statusOf(page, "Tree head")).toBe("Not run");
 });
 
+test("markup in the log's error text is shown as text, never parsed", async ({ page }) => {
+  const evil = "<img src=x onerror=alert(1)>sha256:ab";
+  let dialogs = 0;
+  page.on("dialog", (d) => {
+    dialogs++;
+    void d.dismiss();
+  });
+  await stubLog(page, { ...HONEST, "/v1/sth": { status: 404, body: JSON.stringify({ error: evil }) } });
+  await fill(page, VALID, { log: true });
+  await page.getByRole("button", { name: "Check" }).click();
+  await expect(page.getByRole("status")).toContainText("But the log was not checked");
+  await expect(page.locator(".report h3")).toContainText(evil);
+  await expect(page.locator(".report img")).toHaveCount(0);
+  await expect(page.locator(".report h3 img")).toHaveCount(0);
+  expect(dialogs).toBe(0);
+});
+
 test("a log address that answers with a web page: the log was not checked, its answer could not be read, with a retry", async ({ page }) => {
   await stubLog(page, { ...HONEST, "/v1/sth": { status: 200, body: "<!doctype html><title>Not a log</title>", contentType: "text/html" } });
   await fill(page, VALID, { log: true });
