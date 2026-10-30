@@ -88,7 +88,7 @@ Use a current version of Firefox, Chrome, Edge or Safari.</p>
       <p class="hint" id="log-address-hint">The receipts-log address the issuer uses, starting with https://.</p>
       <input type="url" id="log-address" inputmode="url" spellcheck="false" autocomplete="off" aria-describedby="log-address-hint">
     </div>
-    {file_field("log-key", "Log's public key", LOG_KEY_HINT, "Or choose the log key file", 3)}
+    {file_field("log-key", "Log's public key", LOG_KEY_HINT, "Or choose the log key file", 4)}
     {file_field("witness-keys", "Witness public keys", "Optional. One PEM block per witness.", "Or choose a witness key file", 4)}
   </details>
   <button type="submit" class="button">Check</button>

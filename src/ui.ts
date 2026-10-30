@@ -55,6 +55,23 @@ function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, classN
   return e;
 }
 
+/**
+ * Text with each key fingerprint in a span.hash, so a narrow screen breaks
+ * the fingerprint inside itself rather than leaving the punctuation after it
+ * alone on the next line. Text nodes only: nothing is parsed as HTML.
+ */
+function withHashes<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, text: string): HTMLElementTagNameMap[K] {
+  const e = doc.createElement(tag);
+  let at = 0;
+  for (const m of text.matchAll(/sha256:[0-9a-f]+/g)) {
+    if (m.index > at) e.append(text.slice(at, m.index));
+    e.append(el(doc, "span", "hash", m[0]));
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) e.append(text.slice(at));
+  return e;
+}
+
 async function readKeys(text: string, field: string, source: string, problems: Problem[]): Promise<PublicKey[]> {
   try {
     return await parsePublicKeys(text, source);
@@ -209,7 +226,7 @@ function renderReport(doc: Document, report: ReceiptReport, index: number, total
   const verdict = report.valid
     ? `${label} is valid: signed by ${report.key ?? "the issuer key"}, and unchanged since.${logNote(report, asked)}`
     : `${label} is not valid. ${reason === undefined ? "A check did not pass." : detailOf(reason)}`;
-  article.append(el(doc, "h3", undefined, verdict));
+  article.append(withHashes(doc, "h3", verdict));
   const list = el(doc, "ol", "checks");
   for (const c of report.checks) list.append(renderCheck(doc, c));
   article.append(list);
