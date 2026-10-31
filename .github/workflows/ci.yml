@@ -68,7 +68,7 @@ jobs:
 
   site:
     name: Site (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -76,7 +76,13 @@ jobs:
         # 3.9 is the oldest Python the site supports (pyproject.toml); 3.12
         # is the one CI otherwise pins. The build and the tests run on both;
         # ruff and the budget give the same answer on either, so run once.
-        python: ["3.9", "3.12"]
+        include:
+          # Pinned: actions/python-versions has no 3.9 build for Ubuntu
+          # 26.04 (ubuntu-latest), only up to 24.04.
+          - python: "3.9"
+            runner: ubuntu-24.04
+          - python: "3.12"
+            runner: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -29,6 +29,7 @@
     "typescript-eslint": "8.71.1"
   },
   "overrides": {
-    "playwright-core": "1.64.0"
+    "playwright-core": "1.64.0",
+    "minimatch": "11.0.1"
   }
 }
