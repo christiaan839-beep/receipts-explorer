@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.assets import SCRIPT, hashes  # noqa: E402
 from app.content import SITE  # noqa: E402
-from app.pages import all_routes, render_not_found, render_route  # noqa: E402
+from app.pages import REDIRECTS, all_routes, render_moved, render_not_found, render_route  # noqa: E402
 from app.policies import security_txt  # noqa: E402
 from build import DIST, SECURITY_TXT, robots, sitemap  # noqa: E402
 
@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
             root = self.dist_dir.resolve()
             dirs = [p.parent.relative_to(root).as_posix() for p in root.rglob("index.html") if p.parent != root]
         else:
-            dirs = [r.strip("/") for r in all_routes() if r != "/"]
+            dirs = [r.strip("/") for r in [*all_routes(), *REDIRECTS] if r != "/"]
         return {f"{BASE}/{d}": quote(f"{BASE}/{d}/") for d in dirs if not any(part.startswith(".") for part in d.split("/"))}
 
     def _find(self, rel: str) -> tuple[bytes | str, str] | None:
@@ -150,7 +150,8 @@ class Handler(BaseHTTPRequestHandler):
         if rel.startswith("static/"):
             return self._file(self.static_dir, rel[len("static/") :])
         if rel == "index.html" or rel.endswith("/index.html"):
-            html = render_route("/" + rel[: -len("index.html")], hashes())
+            route = "/" + rel[: -len("index.html")]
+            html = render_route(route, hashes()) or render_moved(route, hashes())
             return None if html is None else (html, TYPES[".html"])
         return None
 

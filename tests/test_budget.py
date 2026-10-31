@@ -103,7 +103,7 @@ class BudgetTest(unittest.TestCase):
         self.assertIn("over budget: static/styles.css", result.stderr)
 
     def test_a_page_at_its_budget_passes_and_one_byte_over_fails(self) -> None:
-        page = self.dist / "terms" / "receipt" / "index.html"
+        page = self.dist / "glossary" / "receipt" / "index.html"
         page.parent.mkdir(parents=True)
         data = compressing_to(12 * KB)
         page.write_bytes(data)
@@ -112,8 +112,8 @@ class BudgetTest(unittest.TestCase):
         page.write_bytes(data + b"\x00")
         result = self.run_on(self.dist)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("terms/receipt/index.html: 12289 bytes compressed (budget 12288)", result.stdout)
-        self.assertIn("over budget: terms/receipt/index.html", result.stderr)
+        self.assertIn("glossary/receipt/index.html: 12289 bytes compressed (budget 12288)", result.stdout)
+        self.assertIn("over budget: glossary/receipt/index.html", result.stderr)
 
     def test_a_missing_stylesheet_fails_and_says_so(self) -> None:
         (self.dist / "static" / "styles.css").unlink()

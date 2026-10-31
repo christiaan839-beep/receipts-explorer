@@ -246,7 +246,35 @@ def load(text: str) -> tuple[list[Term], dict[str, str]]:
     return terms, parts
 
 
+# Words of the vendored ontology this site says otherwise, each replaced
+# exactly once in the rendered definition, so the vendored file stays
+# byte-for-byte upstream's and a change upstream fails the build here.
+# The ontology calls a witness "An independent party", which the site
+# cannot vouch for: a witness is only as independent as whoever runs it
+# (verifiable-receipts should say so too).
+OVERRIDES = {
+    "witness": (
+        "An independent party that cosigns",
+        "A party other than the log that cosigns",
+        " A witness is only as independent as whoever runs it.",
+    ),
+}
+
+
+def override(terms: list[Term]) -> list[Term]:
+    out = []
+    for t in terms:
+        if t.slug in OVERRIDES:
+            old, new, after = OVERRIDES[t.slug]
+            if t.definition.count(old) != 1:
+                raise ValueError(f"the ontology's definition of {t.name!r} changed: {old!r} is not in it once")
+            t = Term(t.name, t.slug, t.definition.replace(old, new) + after, t.scitt, t.group)
+        out.append(t)
+    return out
+
+
 TERMS, SECTIONS = load(SOURCE.read_text(encoding="utf-8"))
+TERMS = override(TERMS)
 BY_SLUG = {t.slug: t for t in TERMS}
 INTRO = paragraphs(_preamble(SECTIONS))
 NAME_NOTE = paragraphs(SECTIONS["One name to read carefully"])

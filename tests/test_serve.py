@@ -204,6 +204,15 @@ class ServeTests(unittest.TestCase):
             self.assertEqual(status, 404, path)
             self.assertIsNone(headers.get("Location"), path)
 
+    def test_an_old_term_address_is_a_page_that_sends_you_to_the_glossary(self) -> None:
+        status, headers, body = self.server.get("/terms/receipt/")
+        self.assertEqual((status, headers["Content-Type"]), (200, "text/html; charset=utf-8"))
+        self.assertIn(b'<meta http-equiv="refresh" content="0; url=/glossary/receipt/">', body)
+        status, headers, _ = self.server.get("/terms/receipt")
+        self.assertEqual((status, headers.get("Location")), (301, "/terms/receipt/"))
+        status, _, body = self.server.get("/terms/")
+        self.assertIn(b"<h1>Terms of use</h1>", body)
+
     def test_the_script_is_the_bundle(self) -> None:
         _, _, body = self.server.get("/static/check.js")
         self.assertEqual(body, (ROOT / "build" / "check.js").read_bytes())

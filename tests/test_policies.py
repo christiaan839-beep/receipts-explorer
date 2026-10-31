@@ -88,7 +88,7 @@ class PrivacyTest(unittest.TestCase):
         for path in sorted((ROOT / "src").rglob("*.ts")):
             source = path.read_text(encoding="utf-8")
             for word in ("localStorage", "sessionStorage", "indexedDB", "document.cookie", "serviceWorker", "sendBeacon", "caches."):
-                self.assertNotIn(word, source, f"{path.name} uses {word}")
+                self.assertNotIn(word, source, path.name)
 
     def test_only_the_log_is_ever_asked_for_anything(self) -> None:
         fetching = [p.name for p in sorted((ROOT / "src").rglob("*.ts")) if re.search(r"\bfetch\(", p.read_text(encoding="utf-8"))]
@@ -97,10 +97,21 @@ class PrivacyTest(unittest.TestCase):
         for name in ("script-src", "style-src", "img-src"):
             self.assertNotIn("http", directives[name], name)
 
+    def test_the_information_officer_is_a_person_and_no_entity_is_invented(self) -> None:
+        # POPIA: the Information Officer is a natural person. The legal entity,
+        # registration number and address are the owner's to confirm.
+        self.assertIn("Information Officer (POPIA): Christiaan de Wet", self.page)
+        self.assertIn("Sovereign Matrix (Christiaan de Wet)", self.page)
+        self.assertNotRegex(self.page, r"(?i)\b(\(Pty\)|Ltd|registration number|reg\. no)\b")
+
+    def test_it_names_the_safeguards_github_relies_on_for_transfers(self) -> None:
+        for words in ("standard contractual clauses", "Data Privacy Framework", "article 13(1)(f)", "section 72"):
+            self.assertIn(words, self.page)
+        self.assertIn("#international-data-transfers", PAGES["/privacy/"])
+
     def test_it_names_the_operator_the_information_officer_and_both_routes_of_complaint(self) -> None:
         for words in (
-            "Sovereign Matrix runs this site",
-            "Information Officer (POPIA): Sovereign Matrix",
+            "Sovereign Matrix (Christiaan de Wet) runs this site",
             SITE["email"],
             "Information Regulator",
             "section 74 of POPIA",
@@ -109,7 +120,11 @@ class PrivacyTest(unittest.TestCase):
             "GitHub General Privacy Statement",
         ):
             self.assertIn(words, self.page)
-        for href in ("https://inforegulator.org.za/complaints/", "https://www.edpb.europa.eu/", "https://docs.github.com/en/site-policy/"):
+        for href in (
+            "https://inforegulator.org.za/complaints/",
+            "https://www.edpb.europa.eu/about-edpb/our-members_en",
+            "https://docs.github.com/en/site-policy/",
+        ):
             self.assertIn(href, PAGES["/privacy/"])
 
 
@@ -128,12 +143,27 @@ class TermsAndSecurityTest(unittest.TestCase):
         self.assertIn('href="/.well-known/security.txt"', page)
 
 
+class MailTest(unittest.TestCase):
+    def test_a_mail_subject_is_percent_encoded(self) -> None:
+        from app.policies import mail
+
+        self.assertIn("?subject=%5Bsecurity%5D%20report%26x", mail("[security] report&x"))
+
+
 class ClaimsTest(unittest.TestCase):
+    def test_no_page_calls_a_witness_an_independent_party(self) -> None:
+        # The vendored ontology says "An independent party"; app/ontology.py overrides it.
+        for route, page in PAGES.items():
+            found = re.search(r"(?i).{0,40}\bindependent part(y|ies)\b", html.unescape(page))
+            self.assertIsNone(found, f"{route}: {found.group(0) if found else ''}")
+
     def test_no_page_promises_compliance_or_a_guarantee(self) -> None:
         for route, page in PAGES.items():
             words = text(page)
             with self.subTest(route=route):
-                for m in re.finditer(r"(?i)\b(compliant|compliance|guarantee\w*|tamper-?proof|certif\w+)\b", words):
+                for m in re.finditer(
+                    r"(?i)\b(compliant|compliance|guarantee\w*|tamper-?proof|certificate\w*|independent part(y|ies))\b", words
+                ):
                     before = words[max(0, m.start() - 60) : m.start()].lower()
                     self.assertRegex(before, r"\b(not|no|nothing|without|does not)\b", f"{route}: …{before}{m.group(0)}")
 

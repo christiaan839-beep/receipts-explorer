@@ -8,24 +8,29 @@ GDPR. The pages load no script.
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from .content import ADVISORY_REPOS, REPOS, SECURITY_TXT_EXPIRES, SITE
-from .layout import absolute, esc, url
+from .layout import absolute, esc, section, url
 
 UPDATED = "31 October 2026"
 GITHUB_PRIVACY = "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+GITHUB_TRANSFERS = GITHUB_PRIVACY + "#international-data-transfers"
+GITHUB_DPA = "https://github.com/customer-terms/github-data-protection-agreement"
 GITHUB_PAGES_DATA = "https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages"
 REGULATOR = "https://inforegulator.org.za/complaints/"
-EDPB_MEMBERS = "https://www.edpb.europa.eu/about-edpb/about-edpb/members_en"
+EDPB_MEMBERS = "https://www.edpb.europa.eu/about-edpb/our-members_en"
+# The responsible party, until the owner confirms its legal status,
+# registration number and postal address (POPIA s18(1)(b), GDPR art 13(1)(a)).
+RESPONSIBLE = "Sovereign Matrix (Christiaan de Wet)"
+# POPIA's Information Officer is a natural person: the head of the body.
+INFORMATION_OFFICER = "Christiaan de Wet"
 
 
 def mail(subject: str = "") -> str:
     # The subject is fixed text from this module, never a visitor's input.
-    query = f"?subject={subject.replace(' ', '%20')}" if subject else ""
+    query = f"?subject={quote(subject, safe='')}" if subject else ""
     return f'<a href="mailto:{SITE["email"]}{query}">{esc(SITE["email"])}</a>'
-
-
-def section(id_: str, title: str, body: str) -> str:
-    return f'<section aria-labelledby="{id_}">\n<h2 id="{id_}">{esc(title)}</h2>\n{body}\n</section>\n'
 
 
 def web_page(name: str, description: str) -> dict:
@@ -38,11 +43,11 @@ def page_privacy() -> tuple[dict, str]:
         "your browser, nothing is uploaded, and it sets no cookies."
     )
     meta = {"path": "/privacy/", "title": "Privacy policy", "description": description, "schema": web_page("Privacy policy", description)}
-    operator = esc(SITE["operator"])
+    operator = esc(RESPONSIBLE)
     who = f"""<p>{operator} runs this site. It is the responsible party under the Protection of Personal Information Act, 2013
 (POPIA), and the controller under the EU General Data Protection Regulation (GDPR), for the little personal information
 this site handles. Contact: {mail("Privacy")}.</p>
-<p>Information Officer (POPIA): {operator}, at {mail("Information Officer")}.</p>"""
+<p>Information Officer (POPIA): {esc(INFORMATION_OFFICER)}, at {mail("Information Officer")}.</p>"""
     what = """<ul>
 <li><strong>The site is static.</strong> It is a set of files served by GitHub Pages. There is no server of ours, no
 account, and no form that sends anything to us.</li>
@@ -59,7 +64,12 @@ its own privacy terms apply.</li>
     github = f"""<p>GitHub Pages serves the site. GitHub says that when a GitHub Pages site is visited, the visitor's IP address is
 logged and stored for security purposes (<a href="{GITHUB_PAGES_DATA}">What is GitHub Pages?</a>). GitHub, Inc. processes
 those logs under the <a href="{GITHUB_PRIVACY}">GitHub General Privacy Statement</a>, and may do so outside South Africa
-and the European Union, including in the United States. {operator} does not receive those logs.</p>"""
+and the European Union, including in the United States. {operator} does not receive those logs.</p>
+<p>For those transfers GitHub states that it relies on the European Commission's standard contractual clauses and on its
+certification under the EU-U.S. Data Privacy Framework (<a href="{GITHUB_TRANSFERS}">international data transfers</a>, in
+its privacy statement). These are the safeguards this policy relies on for GitHub, under article 13(1)(f) of the GDPR and
+section 72 of POPIA. GitHub's <a href="{GITHUB_DPA}">Data Protection Agreement</a> covers its business plans, where GitHub
+processes data for a customer.</p>"""
     contact = f"""<p>If you email {mail()} or send a private security report through GitHub, we receive your address or GitHub
 account and what you write. We use it only to answer you and, for a security report, to fix the flaw and credit you if you
 wish, and we keep it for as long as that takes. The basis is our legitimate interest in answering you (POPIA section

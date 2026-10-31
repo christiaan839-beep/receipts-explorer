@@ -99,3 +99,22 @@ test("the footer's Privacy link is reached and followed with the keyboard", asyn
   await expect(page).toHaveURL(/\/privacy\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Privacy policy");
 });
+
+test("an old term address sends the reader to the glossary page, with no script", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (r) => requests.push(r.url()));
+  await page.goto("./terms/inclusion-proof/");
+  await expect(page).toHaveURL(/\/glossary\/inclusion-proof\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Inclusion proof");
+  expect(requests.filter((u) => u.endsWith(".js"))).toEqual([]);
+});
+
+test.describe("an old term address without JavaScript", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("still has a link to the glossary page", async ({ request }) => {
+    const body = await (await request.get("./terms/receipt/")).text();
+    expect(body).toContain('<a href="/glossary/receipt/">');
+    expect(body).toContain('<meta name="robots" content="noindex">');
+  });
+});

@@ -146,6 +146,23 @@ class OntologyTest(unittest.TestCase):
                 table(body)
 
 
+class OverrideTest(unittest.TestCase):
+    def test_the_witness_is_not_called_independent(self) -> None:
+        from app.ontology import BY_SLUG
+
+        witness = BY_SLUG["witness"].definition
+        self.assertTrue(witness.startswith("A party other than the log that cosigns"), witness)
+        self.assertTrue(witness.endswith("only as independent as whoever runs it."), witness)
+        self.assertNotIn("An independent party", witness)
+
+    def test_an_override_whose_words_are_gone_fails_the_build(self) -> None:
+        from app.ontology import Term, override
+
+        changed = Term("Witness", "witness", "Someone who cosigns.", "", "protocol")
+        with self.assertRaisesRegex(ValueError, "definition of 'Witness' changed"):
+            override([changed])
+
+
 class ContentTest(unittest.TestCase):
     def test_the_seven_checks(self) -> None:
         self.assertEqual(len(CHECKS), 7)

@@ -12,7 +12,7 @@ import re
 
 from .content import CHAIN, CHECKS, PRIVACY, SITE, VR_REF
 from .docs import page_docs, page_keys, page_quickstart
-from .layout import absolute, esc, render_page, url
+from .layout import absolute, esc, render_page, render_redirect, url
 from .ontology import AGENT_INTRO, BY_SLUG, NAME_NOTE, RELATIONS, TERMS, Term
 from .policies import page_privacy, page_security, page_terms_of_use
 
@@ -258,6 +258,16 @@ ROUTES = {
 }
 for _t in TERMS:
     ROUTES[f"/glossary/{_t.slug}/"] = lambda t=_t: page_term(t)
+
+
+# The glossary was at /terms/ until /terms/ became the terms of use: each
+# old term address sends its reader to the term's glossary page.
+REDIRECTS = {f"/terms/{t.slug}/": f"/glossary/{t.slug}/" for t in TERMS}
+
+
+def render_moved(path: str, assets: dict[str, str]) -> str | None:
+    target = REDIRECTS.get(path)
+    return None if target is None else render_redirect(target, assets)
 
 
 def render_route(path: str, assets: dict[str, str]) -> str | None:
