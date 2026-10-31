@@ -19,6 +19,7 @@ from unittest import mock
 import build
 from app.content import SITE
 from app.pages import all_routes
+from app.policies import security_txt
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,13 +50,24 @@ class BuildTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_it_says_what_it_built(self) -> None:
-        self.assertIn(f"Built {len(all_routes())} pages, 404.html, sitemap.xml and robots.txt in {self.dist.resolve()}", self.stdout)
+        self.assertIn(
+            f"Built {len(all_routes())} pages, 404.html, sitemap.xml, robots.txt and .well-known/security.txt in {self.dist.resolve()}",
+            self.stdout,
+        )
 
     def test_every_route_and_file_is_written(self) -> None:
         for route in all_routes():
             rel = "index.html" if route == "/" else route.strip("/") + "/index.html"
             self.assertIn(rel, self.first)
-        for rel in ("404.html", "robots.txt", "sitemap.xml", "static/check.js", "static/styles.css", "static/img/favicon.svg"):
+        for rel in (
+            "404.html",
+            "robots.txt",
+            "sitemap.xml",
+            ".well-known/security.txt",
+            "static/check.js",
+            "static/styles.css",
+            "static/img/favicon.svg",
+        ):
             self.assertIn(rel, self.first)
 
     def test_the_script_is_the_bundle(self) -> None:
@@ -96,6 +108,11 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(snapshot(self.dist), self.first)
         self.assertEqual([p.name for p in self.dist.parent.iterdir()], ["dist"])
 
+    def test_security_txt_is_the_one_hidden_file(self) -> None:
+        hidden = [rel for rel in self.first if any(part.startswith(".") for part in rel.split("/"))]
+        self.assertEqual(hidden, [".well-known/security.txt"])
+        self.assertEqual((self.dist / ".well-known" / "security.txt").read_text(encoding="utf-8"), security_txt())
+
     def test_the_site_is_readable_by_all(self) -> None:
         self.assertEqual(stat.S_IMODE(self.dist.stat().st_mode), 0o755)
 
@@ -132,7 +149,8 @@ class BuildInProcessTest(unittest.TestCase):
             build.main(["--out", str(self.dist)])
         names = {str(p.relative_to(self.dist)) for p in self.dist.rglob("*")}
         self.assertIn("static/styles.css", names)
-        self.assertFalse([n for n in names if Path(n).name.startswith(".")], names)
+        # .well-known/security.txt is the site's own, written by build.py, not from static/.
+        self.assertFalse([n for n in names if n.startswith("static/") and Path(n).name.startswith(".")], names)
 
     def test_the_default_output_is_dist(self) -> None:
         self.assertEqual(build.DIST, ROOT / "dist")

@@ -26,6 +26,7 @@ async function axe(page: Page): Promise<void> {
 test("the sitemap lists the pages", () => {
   expect(LISTED).toContain("/");
   expect(LISTED).toContain("/glossary/receipt/");
+  for (const route of ["/docs/", "/docs/quickstart/", "/keys/", "/privacy/", "/terms/", "/security/"]) expect(LISTED).toContain(route);
   expect(LISTED).not.toContain("/404.html");
   expect(LISTED.length).toBeGreaterThan(20);
 });

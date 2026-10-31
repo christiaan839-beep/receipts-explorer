@@ -15,6 +15,7 @@ from unittest import mock
 
 import serve
 from app.pages import all_routes
+from app.policies import security_txt
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -193,6 +194,15 @@ class ServeTests(unittest.TestCase):
         for path, host in (("/nope/", None), ("/glossary", None), ("/", "attacker.example")):
             _, headers, _ = self.server.get(path, host=host)
             self.assertEqual(headers["X-Content-Type-Options"], "nosniff", path)
+
+    def test_security_txt_is_the_one_hidden_file_served(self) -> None:
+        status, headers, body = self.server.get("/.well-known/security.txt")
+        self.assertEqual((status, headers["Content-Type"]), (200, "text/plain; charset=utf-8"))
+        self.assertEqual(body.decode("utf-8"), security_txt())
+        for path in ("/.well-known/", "/.well-known", "/.well-known/other.txt", "/.well-known/security.txt/", "/.well-known/../.env"):
+            status, headers, _ = self.server.get(path)
+            self.assertEqual(status, 404, path)
+            self.assertIsNone(headers.get("Location"), path)
 
     def test_the_script_is_the_bundle(self) -> None:
         _, _, body = self.server.get("/static/check.js")
