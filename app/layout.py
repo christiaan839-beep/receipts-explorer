@@ -14,7 +14,7 @@ from __future__ import annotations
 import html
 import json
 
-from .content import NAV, SITE
+from .content import FOOTER, NAV, SITE
 
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https:; base-uri 'none'; "
@@ -103,11 +103,14 @@ def _header(meta: dict) -> str:
 
 
 def _footer() -> str:
+    links = "".join(f'<li><a href="{url(f["path"])}">{esc(f["label"])}</a></li>' for f in FOOTER)
     return f"""<footer class="site-footer">
   <div class="container">
+    <nav aria-label="Footer"><ul class="footer-nav">{links}</ul></nav>
     <p>Open source, Apache-2.0: <a href="{esc(SITE["repo"])}">receipts-explorer on GitHub</a>.
     The checks are those of <a href="{esc(SITE["vr_repo"])}">verifiable-receipts</a>.</p>
-    <p>{esc(SITE["author"])}.</p>
+    <p>Run by {esc(SITE["operator"])}: <a href="mailto:{esc(SITE["email"])}">{esc(SITE["email"])}</a>.
+    A receipt is evidence for an audit, not legal or compliance advice.</p>
   </div>
 </footer>"""
 

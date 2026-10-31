@@ -22,12 +22,51 @@ SITE = {
     "repo": "https://github.com/christiaan839-beep/receipts-explorer",
     "vr_repo": "https://github.com/christiaan839-beep/verifiable-receipts",
     "author": "Christiaan de Wet / Sovereign Matrix",
+    "operator": "Sovereign Matrix",
+    "email": "sovereign.systems007@gmail.com",
 }
+
+# The projects the docs describe, and the specifications they cite, at the
+# commit the vendored code comes from (VR_REF), so a section number names
+# the text the site was written against.
+REPOS = {
+    "verifiable-receipts": "https://github.com/christiaan839-beep/verifiable-receipts",
+    "receipts-log": "https://github.com/christiaan839-beep/receipts-log",
+    "verify-receipts-action": "https://github.com/christiaan839-beep/verify-receipts-action",
+    "sovereign-agents": "https://github.com/christiaan839-beep/sovereign-agents",
+    "receipts-explorer": "https://github.com/christiaan839-beep/receipts-explorer",
+}
+VAOS = f"{REPOS['verifiable-receipts']}/blob/{VR_REF}/docs/specs/vaos-2.0.md"
+LOG_SPEC = f"{REPOS['verifiable-receipts']}/blob/{VR_REF}/docs/specs/transparency-log.md"
+
+# The repositories that take a private report through GitHub's private
+# vulnerability reporting. sovereign-agents has it switched off, so its
+# reports go by email.
+ADVISORY_REPOS = ["receipts-explorer", "verifiable-receipts", "receipts-log", "verify-receipts-action"]
+
+# security.txt (RFC 9116). Expires is a fixed date, so a rebuild stays
+# byte-identical; tests/test_policies.py fails once it is less than 30
+# days away, which is the reminder to renew it.
+SECURITY_TXT_EXPIRES = "2027-10-01T00:00:00.000Z"
 
 NAV = [
     {"label": "Check a receipt", "path": "/", "key": "check"},
     {"label": "How it works", "path": "/how-it-works/", "key": "how"},
+    {"label": "Docs", "path": "/docs/", "key": "docs"},
+    {"label": "Keys", "path": "/keys/", "key": "keys"},
     {"label": "Glossary", "path": "/glossary/", "key": "glossary"},
+]
+
+# The footer's links: the docs, the policies, and the files for machines.
+FOOTER = [
+    {"label": "Docs", "path": "/docs/"},
+    {"label": "Quickstart", "path": "/docs/quickstart/"},
+    {"label": "Keys", "path": "/keys/"},
+    {"label": "Privacy", "path": "/privacy/"},
+    {"label": "Terms of use", "path": "/terms/"},
+    {"label": "Security", "path": "/security/"},
+    {"label": "security.txt", "path": "/.well-known/security.txt"},
+    {"label": "Sitemap", "path": "/sitemap.xml"},
 ]
 
 # The seven checks, shared with the script (src/ui.ts imports the same file).

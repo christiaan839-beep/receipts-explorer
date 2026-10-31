@@ -1,7 +1,8 @@
 """The page bodies and the ROUTES map.
 
 Every page has one h1, reads in full without JavaScript, and links each
-check to the term it relies on. Only the check page loads the script.
+check to the term it relies on. Only the check page loads the script. The
+docs are in docs.py and the policies in policies.py.
 """
 
 from __future__ import annotations
@@ -10,8 +11,10 @@ import html
 import re
 
 from .content import CHAIN, CHECKS, PRIVACY, SITE, VR_REF
+from .docs import page_docs, page_keys, page_quickstart
 from .layout import absolute, esc, render_page, url
 from .ontology import AGENT_INTRO, BY_SLUG, NAME_NOTE, RELATIONS, TERMS, Term
+from .policies import page_privacy, page_security, page_terms_of_use
 
 
 def plain(fragment: str, limit: int = 155) -> str:
@@ -240,7 +243,17 @@ def not_found() -> tuple[dict, str]:
     return meta, body
 
 
-ROUTES = {"/": page_check, "/how-it-works/": page_how, "/glossary/": page_glossary}
+ROUTES = {
+    "/": page_check,
+    "/how-it-works/": page_how,
+    "/docs/": page_docs,
+    "/docs/quickstart/": page_quickstart,
+    "/keys/": page_keys,
+    "/glossary/": page_glossary,
+    "/privacy/": page_privacy,
+    "/terms/": page_terms_of_use,
+    "/security/": page_security,
+}
 for _t in TERMS:
     ROUTES[f"/glossary/{_t.slug}/"] = lambda t=_t: page_term(t)
 
