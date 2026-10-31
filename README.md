@@ -54,7 +54,7 @@ quoted from `content/checks.json`, the same sentences the site shows.
    root, signed by a witness key you gave. A fork cosignature whose text is
    not canonical, or whose signature does not verify under a key you gave,
    is skipped. A log that withholds a fork cosignature is not caught here.
-   - Proves: "Independent witnesses saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size."
+   - Proves: "The witnesses whose keys you gave saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size."
    - Does not prove: "That the witnesses are independent of the log; that depends on who runs them."
 
 Each is passed, failed or not run. A check that cannot run is never shown

@@ -87,7 +87,12 @@ CHAIN = [
     ),
     ("tree-head", "Tree head", "The log signs its size and root from time to time, committing to every entry so far."),
     ("inclusion-proof", "Inclusion proof", "A few hashes that link one receipt to the root in a signed tree head."),
-    ("witness", "Witness", "Independent parties cosign a tree head only if it extends the last one they cosigned."),
+    (
+        "witness",
+        "Witness",
+        "Parties other than the log cosign a tree head only if it extends the last one they cosigned. "
+        "A witness is only as independent as whoever runs it.",
+    ),
     (
         "verifier",
         "Verifier",

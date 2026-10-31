@@ -72,7 +72,8 @@ def page_check() -> tuple[dict, str]:
     }
     privacy = "".join(f"<li>{esc(p)}</li>" for p in PRIVACY)
     body = f"""<h1>Check a receipt</h1>
-<p class="lede">A receipt is an issuer's signed record of something an AI agent did. Paste one with the issuer's public key,
+<p class="lede">A receipt is an issuer's signed record of what it says an AI agent did: evidence for an audit, not proof
+that it happened. Paste one with the issuer's public key,
 and this page checks, in your browser, that the issuer signed exactly this text. Give a receipts-log address and the
 log's public key too, and it checks that the receipt is in the log; with witness keys, that witnesses saw the same log.</p>
 <p id="needs-js" class="notice">Checking needs JavaScript, which is off or did not load. The rest of this page explains the checks.</p>
@@ -143,8 +144,8 @@ def page_how() -> tuple[dict, str]:
         "path": "/how-it-works/",
         "title": "How it works: the chain of trust",
         "description": (
-            "How a receipt is checked without trusting the agent, its host or the log: issuer, receipt, "
-            "transparency log, tree head, inclusion proof and witnesses."
+            "How a receipt is checked without taking the agent's, its host's or the log's word for it: "
+            "issuer, receipt, log, tree head, inclusion proof, witnesses."
         ),
         "active": "how",
         "schema": {"@type": "TechArticle", "headline": "How it works: the chain of trust", "inLanguage": SITE["locale"]},
@@ -153,8 +154,9 @@ def page_how() -> tuple[dict, str]:
     note = "".join(f"<p>{p}</p>" for p in NAME_NOTE)
     body = f"""<h1>How it works</h1>
 <p class="lede">An AI agent acts for a business. The business signs a receipt for each action, and appends it to a
-transparency log that is meant only to grow; witnesses check that it does. Anyone can then check the receipt, and its
-place in the log, without trusting the agent, its host or the log.</p>
+transparency log that is meant only to grow; witnesses check that it does. Anyone with the issuer's and the log's public keys,
+from a source they trust, can then check the receipt and its place in the log without taking the agent's, its host's or
+the log's word for it.</p>
 {chain_figure()}
 <h2>What each part promises</h2>
 <ul>{relations}</ul>
