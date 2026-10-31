@@ -37,6 +37,8 @@
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); overflow-wrap: anywhere; }
 .hash { word-break: break-all; }
+/* A key fingerprint and its punctuation move to the next line whole; see withHashes in src/ui.ts. */
+.nowrap { white-space: nowrap; }
 a { color: var(--link); text-underline-offset: 0.15em; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .container { max-width: 48rem; margin: 0 auto; padding: 0 var(--space); }

@@ -55,18 +55,35 @@ function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, classN
   return e;
 }
 
+// "sha256:" and 16 hex characters: the fingerprint keys.ts makes.
+const FINGERPRINT_LENGTH = 23;
+
 /**
- * Text with each key fingerprint in a span.hash, so a narrow screen breaks
- * the fingerprint inside itself rather than leaving the punctuation after it
- * alone on the next line. Text nodes only: nothing is parsed as HTML.
+ * Text with each key fingerprint in a code.fingerprint, held with the
+ * punctuation right after it in a span.nowrap, which nothing breaks
+ * inside: a narrow screen moves the fingerprint and its comma to the next
+ * line whole. (A fingerprint used to be a span.hash, whose break-all split
+ * it mid-word to fill the line on a phone.) At 23 characters and a comma it
+ * fits the narrowest supported screen, 320 px. A longer hash is still a
+ * span.hash, which may break anywhere, so it never widens the page. Text
+ * nodes only: nothing is parsed as HTML.
  */
 function withHashes<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, text: string): HTMLElementTagNameMap[K] {
   const e = doc.createElement(tag);
   let at = 0;
   for (const m of text.matchAll(/sha256:[0-9a-f]+/g)) {
     if (m.index > at) e.append(text.slice(at, m.index));
-    e.append(el(doc, "span", "hash", m[0]));
     at = m.index + m[0].length;
+    if (m[0].length > FINGERPRINT_LENGTH) {
+      e.append(el(doc, "span", "hash", m[0]));
+      continue;
+    }
+    const punctuation = /^[^\s\w]*/.exec(text.slice(at))?.[0] ?? "";
+    const run = el(doc, "span", "nowrap");
+    run.append(el(doc, "code", "fingerprint", m[0]));
+    if (punctuation !== "") run.append(punctuation);
+    e.append(run);
+    at += punctuation.length;
   }
   if (at < text.length) e.append(text.slice(at));
   return e;
