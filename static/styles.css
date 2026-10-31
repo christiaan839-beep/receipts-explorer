@@ -111,6 +111,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
    a scroll bar, or a tab stop to reach one, at 320 px. */
 .code { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem; font-size: 0.85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .code code { font-size: inherit; }
+.sample { margin: 1rem 0; }
+.sample figcaption { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.25rem; }
+.sample .code { margin: 0; }
 .toc { border-left: 3px solid var(--line); padding-left: var(--space); margin: 1rem 0 1.5rem; }
 .toc ul { margin: 0; padding-left: 1rem; }
 .unpublished, .policy, .key { border: 1px solid var(--line); border-left: 6px solid var(--net); border-radius: 6px; padding: 0.5rem var(--space); }

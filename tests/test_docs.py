@@ -29,7 +29,7 @@ def fingerprint(pem: str) -> str:
 
 
 def text(page: str) -> str:
-    return html.unescape(re.sub(r"<[^>]+>", "", page))
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", page)))
 
 
 class QuickstartTest(unittest.TestCase):
@@ -66,7 +66,46 @@ class QuickstartTest(unittest.TestCase):
         self.assertNotRegex(text(QUICKSTART), r"(?i)is (now )?(on|published to|available on) (npm|pypi)")
 
     def test_the_typescript_sample_says_what_it_does_not_check(self) -> None:
-        self.assertIn("exports no whole-receipt v2 verifier", QUICKSTART)
+        start = QUICKSTART.index('<h2 id="typescript">')
+        section = text(QUICKSTART[start : QUICKSTART.index("</section>", start)])
+        self.assertIn("a signature check, not a receipt verifier", section)
+        # Every step of VAOS 2.0 section 7 the sample does not make is named.
+        for skipped in ("§7.2", "step 3", "contentHash", "step 5", "step 6"):
+            self.assertIn(skipped, section)
+        for full in ("the Python or Go library", "the action", "this site"):
+            self.assertIn(full, section)
+
+    def test_each_sample_on_the_page_is_its_file(self) -> None:
+        for name in ("verify.py", "main.go", "verify-signature.mjs", "verify-receipts.yml"):
+            sample = (ROOT / "content/samples" / name).read_text(encoding="utf-8").rstrip("\n")
+            self.assertIn(html.escape(sample, quote=True), QUICKSTART, name)
+
+    def test_the_go_module_s_published_v0_1_0_is_named_and_warned_against(self) -> None:
+        words = text(QUICKSTART)
+        self.assertNotIn("None of the libraries is on a package registry", words)
+        self.assertIn("v0.1.0 is on proxy.golang.org", words)
+        self.assertIn("predates the strict Ed25519 profile", words)
+        self.assertIn("retracted when v0.2.0 is tagged", words)
+        self.assertIn("Do not use it", words)
+
+    def test_the_install_steps_can_be_run_as_written(self) -> None:
+        words = html.unescape(QUICKSTART)
+        self.assertIn("python3 -m venv .venv", words)
+        for install in (docs.PY_INSTALL, docs.GO_INSTALL, docs.TS_INSTALL):
+            self.assertTrue(install.startswith("git clone https://github.com/christiaan839-beep/verifiable-receipts"), install)
+            self.assertNotIn("/path/to/", install)
+            self.assertIn("./verifiable-receipts/packages/", install)
+
+    def test_how_to_steps_have_text(self) -> None:
+        data = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', QUICKSTART, re.S).group(1))
+        steps = data["@graph"][1]["step"]
+        self.assertTrue(steps)
+        for step in steps:
+            self.assertTrue(step["text"].strip(), step)
+
+    def test_the_samples_were_run_at_the_current_mains(self) -> None:
+        self.assertEqual(docs.SAMPLES_RUN["verifiable-receipts"][:7], "c18d56c")
+        self.assertEqual(docs.SAMPLES_RUN["verify-receipts-action"][:7], "959adf5")
 
 
 class KeysTest(unittest.TestCase):
@@ -85,6 +124,15 @@ class KeysTest(unittest.TestCase):
         self.assertIn("No production key is published yet.", section)
         self.assertNotIn("BEGIN PUBLIC KEY", section)
         self.assertIsNone(re.search(r"sha256:[0-9a-f]{16}", section))
+
+    def test_the_policy_promises_only_what_the_ruleset_enforces(self) -> None:
+        # main's ruleset requires the CI checks to pass, and 0 approvals.
+        self.assertIn("a pull request that must pass CI", KEYS)
+        self.assertNotIn("reviewed pull request", KEYS)
+
+    def test_the_log_key_note_says_the_tree_heads_are_signed_ahead(self) -> None:
+        self.assertIn("scripts/make-stub-log.mjs", docs.LOG_NOTE)
+        self.assertNotIn("tests sign", docs.LOG_NOTE)
 
     def test_the_policy_is_marked_as_the_operator_s(self) -> None:
         start = KEYS.index('<div class="policy">')
@@ -112,6 +160,17 @@ class CitationsTest(unittest.TestCase):
             self.assertIn(f"{VAOS}#{anchor}", DOCS)
         for anchor in ("5-witness-protocol", "6-threat-model", "34-inclusion-proof"):
             self.assertIn(f"{LOG_SPEC}#{anchor}", DOCS)
+
+    def test_each_claim_cites_what_says_it(self) -> None:
+        words = html.unescape(DOCS)
+        # Reading a log's entries is receipts-log's API, not the threat model.
+        self.assertIn(f"{docs.LOG_API}#get-v1entriesindex", DOCS)
+        self.assertIn("/blob/694a29e359ea3bd35a6324dcfc640ba2d8ded8dc/API.md", docs.LOG_API)
+        self.assertIn("must never remove a leaf", words)
+        self.assertNotIn("never removes", words)
+        # "Only as independent as whoever runs it" is the site's own sentence, cited to nothing.
+        at = words.index("only as independent as whoever runs it")
+        self.assertNotIn("§", words[at : words.index("</p>", at)])
 
     def test_the_docs_call_a_receipt_evidence_not_compliance(self) -> None:
         words = text(DOCS)

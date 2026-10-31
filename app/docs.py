@@ -3,8 +3,10 @@
 Every claim about the format names the section of VAOS 2.0 or of the
 transparency-log spec it comes from, at the commit in VR_REF. The
 quickstart's receipt and key are the conformance corpus's own
-(test/fixtures/conformance/), and tests/test_docs.py checks that they are
-and that each fingerprint shown is its key's. The pages load no script.
+(test/fixtures/conformance/), its samples are the files in
+content/samples/, and tests/test_docs.py checks that they are and that
+each fingerprint shown is its key's; test/quickstart-sample.test.ts runs
+the TypeScript sample. The pages load no script.
 """
 
 from __future__ import annotations
@@ -12,9 +14,10 @@ from __future__ import annotations
 import json
 
 from .content import LOG_SPEC, REPOS, ROOT, SITE, VAOS, VR_REF
-from .layout import esc, url
+from .layout import esc, section, url
 
 FIXTURES = ROOT / "test" / "fixtures"
+SAMPLES = ROOT / "content" / "samples"
 TEST_RECEIPT = json.dumps(json.loads((FIXTURES / "conformance" / "v2-valid-001.json").read_text(encoding="utf-8"))["receipt"], indent=2)
 TEST_ISSUER_KEY = (FIXTURES / "conformance" / "public-key.pem").read_text(encoding="utf-8").strip()
 TEST_LOG_KEY = (FIXTURES / "log" / "log-public-key.pem").read_text(encoding="utf-8").strip()
@@ -24,7 +27,12 @@ TEST_ISSUER_FINGERPRINT = "sha256:aed57754623c5598"
 TEST_LOG_FINGERPRINT = "sha256:a5aa2522ffabd27b"
 
 # The commits the quickstart's samples were run against, on 31 October 2026.
-SAMPLES_RUN = {"verifiable-receipts": "7a741a4898141f6729f8ff74d21ef92f273d4e18", "verify-receipts-action": "068148a"}
+SAMPLES_RUN = {
+    "verifiable-receipts": "c18d56c99c6271e722dcd111c8c15a9ed550a23d",
+    "verify-receipts-action": "959adf5dae2d5b954828f6b1e14e289f1af3debf",
+}
+# receipts-log's HTTP API, at the commit the docs were checked against.
+LOG_API = f"{REPOS['receipts-log']}/blob/694a29e359ea3bd35a6324dcfc640ba2d8ded8dc/API.md"
 ACTION_V010 = "e0061c5da823f0889d1720ab68fa4f1e7c721cee"
 GO_MODULE = "github.com/christiaan839-beep/verifiable-receipts/packages/verifiable-receipts-go"
 
@@ -42,18 +50,14 @@ def repo(name: str) -> str:
     return f'<a href="{REPOS[name]}">{esc(name)}</a>'
 
 
-def code(text: str, label: str) -> str:
-    """A block of code or text to copy, named for screen readers."""
-    return f'<pre class="code" aria-label="{esc(label)}"><code>{esc(text)}</code></pre>'
+def code(text: str, caption: str) -> str:
+    """A block of code or text to copy, in a figure its caption names."""
+    return f'<figure class="sample"><figcaption>{esc(caption)}</figcaption><pre class="code"><code>{esc(text)}</code></pre></figure>'
 
 
 def contents(items: list[tuple[str, str]]) -> str:
     links = "".join(f'<li><a href="#{id_}">{esc(text)}</a></li>' for id_, text in items)
     return f'<nav class="toc" aria-label="On this page"><ul>{links}</ul></nav>'
-
-
-def section(id_: str, title: str, body: str) -> str:
-    return f'<section aria-labelledby="{id_}">\n<h2 id="{id_}">{esc(title)}</h2>\n{body}\n</section>\n'
 
 
 def sections(parts: list[tuple[str, str, str]]) -> str:
@@ -159,10 +163,11 @@ A transparency log, such as {repo("receipts-log")}, addresses that.</p>
 own ({log_sec("3.3", "33-signed-tree-head-sth")}).</li>
 <li>An inclusion proof links one receipt to the root in a signed tree head ({log_sec("3.4", "34-inclusion-proof")}), so
 the log cannot later deny holding it. A consistency proof shows that a later tree only appended to an earlier one
-({log_sec("3.5", "35-consistency-proof")}). A log never removes a leaf ({log_sec("4", "4-append-protocol")}).</li>
+({log_sec("3.5", "35-consistency-proof")}). A log must never remove a leaf ({log_sec("4", "4-append-protocol")}).</li>
 </ul>
-<p>Anyone can read what a log holds, so a receipt's <code>canonical</code> must hold no personal information that may not
-be published ({log_sec("4", "4-append-protocol")}; {log_sec("6", "6-threat-model")}).</p>""",
+<p>Anyone can read what a log holds: receipts-log serves each entry, the receipt as submitted, to whoever asks
+(<a href="{LOG_API}#get-v1entriesindex">its API</a>, <code>GET /v1/entries/{{index}}</code>). So a receipt's
+<code>canonical</code> must hold no personal information that may not be published ({log_sec("4", "4-append-protocol")}).</p>""",
         ),
         (
             "witnesses",
@@ -172,8 +177,8 @@ tree head it cosigned, and cosigns the new one only if it extends that one; if n
 ({log_sec("5", "5-witness-protocol")}). A log that forks its history then goes without the witnesses' cosignatures, or
 fails their check.</p>
 <p>The limits are those of {log_sec("6", "6-threat-model")}: a fork is caught only when someone compares tree heads, and
-these projects have no gossip between witnesses; witnesses that collude can cosign a fork; and a witness is only as
-independent as whoever runs it.</p>""",
+these projects have no gossip between witnesses; and witnesses that collude can cosign a fork.</p>
+<p>A witness is also only as independent as whoever runs it, so check who runs the witnesses whose keys you use.</p>""",
         ),
         (
             "proves",
@@ -220,77 +225,30 @@ valid receipt does and does not prove. A receipt is evidence for an audit, not a
     return meta, body
 
 
-PY_SAMPLE = """from sovereign_matrix.verifiable_receipts import parse_receipt, verify_v2_receipt
+def sample(name: str) -> str:
+    return (SAMPLES / name).read_text(encoding="utf-8").rstrip("\n")
 
-receipt = parse_receipt(open("receipt.json", encoding="utf-8").read())
-result = verify_v2_receipt(receipt, open("ed25519.pem", "rb").read())
-print(result.ok, result.reason)"""
 
-GO_SAMPLE = f"""package main
+PY_SAMPLE = sample("verify.py")
+GO_SAMPLE = sample("main.go")
+TS_SAMPLE = sample("verify-signature.mjs")
+ACTION_SAMPLE = sample("verify-receipts.yml")
 
-import (
-	"fmt"
-	"os"
-
-	vaos "{GO_MODULE}"
-)
-
-func main() {{
-	pemBytes, err := os.ReadFile("ed25519.pem")
-	if err != nil {{
-		panic(err)
-	}}
-	pub, err := vaos.LoadEd25519PublicKeyFromPEM(pemBytes)
-	if err != nil {{
-		panic(err)
-	}}
-	data, err := os.ReadFile(os.Args[1])
-	if err != nil {{
-		panic(err)
-	}}
-	receipt, err := vaos.ParseReceipt(data)
-	if err != nil {{
-		panic(err)
-	}}
-	result := vaos.VerifyV2Receipt(receipt, pub)
-	fmt.Println(result.OK, result.Reason)
-}}"""
-
-TS_SAMPLE = """import { readFileSync } from "node:fs";
-import { loadEd25519PublicKey, verifyEd25519 } from "@sovereignos/verifiable-receipts";
-
-const receipt = JSON.parse(readFileSync("receipt.json", "utf8"));
-const key = loadEd25519PublicKey(readFileSync("ed25519.pem"));
-const signature = Buffer.from(receipt.signature.slice("v2=".length), "base64");
-console.log(verifyEd25519(key, Buffer.from(receipt.canonical, "utf8"), signature));"""
-
-ACTION_SAMPLE = """permissions:
-  contents: read
-
-jobs:
-  receipts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Verify receipts
-        uses: christiaan839-beep/verify-receipts-action@FULL_COMMIT_SHA # the release you reviewed
-        with:
-          receipts: |
-            receipts/**/*.json
-          public-keys-file: .github/receipt-keys/issuer.pem"""
-
-PY_INSTALL = """git clone https://github.com/christiaan839-beep/verifiable-receipts
+# Run in one directory, which holds the clone and the two test files.
+CLONE = "git clone https://github.com/christiaan839-beep/verifiable-receipts"
+PY_INSTALL = f"""{CLONE}
+python3 -m venv .venv
+. .venv/bin/activate
 pip install ./verifiable-receipts/packages/verifiable-receipts-py"""
 
-GO_INSTALL = f"""go mod init example.com/verify
-go mod edit -replace={GO_MODULE}=/path/to/verifiable-receipts/packages/verifiable-receipts-go
+GO_INSTALL = f"""{CLONE}
+go mod init example.com/verify
+go mod edit -replace={GO_MODULE}=./verifiable-receipts/packages/verifiable-receipts-go
 go mod tidy"""
 
-TS_INSTALL = """git clone https://github.com/christiaan839-beep/verifiable-receipts
+TS_INSTALL = f"""{CLONE}
 (cd verifiable-receipts/packages/verifiable-receipts && npm ci)
-npm install --install-links /path/to/verifiable-receipts/packages/verifiable-receipts"""
+npm install --install-links ./verifiable-receipts/packages/verifiable-receipts"""
 
 
 def unpublished(command: str, release: str) -> str:
@@ -298,12 +256,23 @@ def unpublished(command: str, release: str) -> str:
 Once it is: <code>{esc(command)}</code>. Until then, install from the repository:</p>"""
 
 
+GO_V010 = f"""<p class="unpublished"><strong>Do not use v0.1.0.</strong> The module's v0.1.0 is on proxy.golang.org, and
+<code>go get {esc(GO_MODULE)}@latest</code> resolves to it today, but it predates the strict Ed25519 profile of
+{sec("7.3", "73-ed25519-verification")}: it accepts signatures other verifiers reject. It will be retracted when v0.2.0 is
+tagged (the module's <code>go.mod</code> already says <code>retract v0.1.0</code>). Do not use it.</p>"""
+
+
 def page_quickstart() -> tuple[dict, str]:
     description = (
         "Check a receipt in five minutes: on this site, with the Python, Go or TypeScript library, "
         "or in CI with the GitHub Action, using a test receipt and test key."
     )
-    steps = ["Save the test receipt and its key", "Check it on this site", "Check it with a library", "Check it in CI"]
+    steps = [
+        ("Save the test receipt and its key", "Save receipt.json and ed25519.pem, a receipt and key made for tests."),
+        ("Check it on this site", "Paste both into the check page and press Check: the four receipt checks pass."),
+        ("Check it with a library", "Run verify.py or main.go; the TypeScript sample checks the signature only."),
+        ("Check it in CI", "Add verify-receipts-action to a workflow, with the key pinned in the repository."),
+    ]
     meta = {
         "path": "/docs/quickstart/",
         "title": "Quickstart: verify a receipt in five minutes",
@@ -315,15 +284,15 @@ def page_quickstart() -> tuple[dict, str]:
             "description": description,
             "inLanguage": SITE["locale"],
             "totalTime": "PT5M",
-            "step": [{"@type": "HowToStep", "position": i, "name": name} for i, name in enumerate(steps, 1)],
+            "step": [{"@type": "HowToStep", "position": i, "name": name, "text": text} for i, (name, text) in enumerate(steps, 1)],
         },
     }
     parts = [
         (
             "files",
             "1. Save the test receipt and its key",
-            f"""<p>Save this as <code>receipt.json</code>. It is <code>v2-valid-001.json</code> of the verifiable-receipts
-conformance corpus, a receipt made for tests.</p>
+            f"""<p>Make a directory for the quickstart and work in it. Save this as <code>receipt.json</code>. It is
+<code>v2-valid-001.json</code> of the verifiable-receipts conformance corpus, a receipt made for tests.</p>
 {code(TEST_RECEIPT, "receipt.json, the test receipt")}
 <p>Save this as <code>ed25519.pem</code>. <strong>It is a test key</strong>: the corpus was signed with it and its private
 half was discarded. Its fingerprint is <code>{TEST_ISSUER_FINGERPRINT}</code>. Never trust a receipt because it verifies
@@ -347,41 +316,56 @@ log was given.</li>
         (
             "python",
             "3. With Python",
-            f"""<p>Python 3.10 or later, package <code>sovereign-matrix-verifiable-receipts</code>.</p>
+            f"""<p>Python 3.10 or later, package <code>sovereign-matrix-verifiable-receipts</code>. It makes every step of
+{sec("7", "7-verification-procedure")}.</p>
 {unpublished("pip install sovereign-matrix-verifiable-receipts", "0.3.0 on PyPI")}
-{code(PY_INSTALL, "Install the Python package from the repository")}
-<p>Save as <code>verify.py</code> beside the two files and run <code>python verify.py</code>:</p>
+{code(PY_INSTALL, "Install from the repository, in a virtual environment")}
+<p>Save as <code>verify.py</code> and run <code>python verify.py</code>:</p>
 {code(PY_SAMPLE, "verify.py")}
-<p>It prints <code>True None</code>; for a receipt that fails, <code>False</code> and the reason.</p>""",
+<p>It prints <code>True None</code>; for a receipt that fails, <code>False</code> and the reason, such as
+<code>contentHash mismatch with canonical bytes</code>.</p>""",
         ),
         (
             "go",
             "4. With Go",
-            f"""<p>Go 1.22 or later; the module uses the standard library only.</p>
+            f"""<p>Go 1.22 or later; the module uses the standard library only, and makes every step of
+{sec("7", "7-verification-procedure")}.</p>
+{GO_V010}
 {unpublished(f"go get {GO_MODULE}@v0.2.0", "v0.2.0 of the Go module")}
-{code(GO_INSTALL, "Use a clone of the repository from your module")}
-<p>Save as <code>main.go</code> and run <code>go run . receipt.json</code>; it prints <code>true</code>.</p>
+{code(GO_INSTALL, "Use the clone from your own module")}
+<p>Save as <code>main.go</code> and run <code>go run . receipt.json</code>; it prints <code>true</code>, or
+<code>false</code> and the reason.</p>
 {code(GO_SAMPLE, "main.go")}""",
         ),
         (
             "typescript",
-            "5. With TypeScript or JavaScript",
+            "5. With TypeScript or JavaScript: the signature only",
             f"""<p>Node.js 22.12 or later, package <code>@sovereignos/verifiable-receipts</code>.</p>
 {unpublished("npm install @sovereignos/verifiable-receipts", "0.5.1 on npm")}
-{code(TS_INSTALL, "Install the TypeScript package from the repository")}
-<p>Save as <code>verify.mjs</code> and run <code>node verify.mjs</code>; it prints <code>{{ ok: true }}</code>.</p>
-{code(TS_SAMPLE, "verify.mjs")}
-<p>This checks the signature over <code>canonical</code> under the strict profile of
-{sec("7.3", "73-ed25519-verification")}. The package exports no whole-receipt v2 verifier, so this does not check
-<code>contentHash</code> or the fields beside <code>canonical</code>; the Python and Go libraries, the action and this site
-do.</p>""",
+{code(TS_INSTALL, "Install from the repository")}
+<p><strong>This sample is a signature check, not a receipt verifier.</strong> The package (0.5.1) exports no
+whole-receipt v2 verifier, so the sample makes three steps of {sec("7", "7-verification-procedure")} itself: it requires
+the <code>v2=</code> prefix (step 1), requires the base64 to be spelled the one valid way (step 2), and checks the Ed25519
+signature over <code>canonical</code> under the strict profile of {sec("7.3", "73-ed25519-verification")} (step 4). It
+does not make the others:</p>
+<ul>
+<li>the nesting limit of {sec("7.2", "72-nesting-depth")}, on the receipt and on <code>canonical</code>;</li>
+<li>step 3: that <code>contentHash</code> is the SHA-256 of <code>canonical</code>;</li>
+<li>step 5: that <code>canonical</code> is a JSON object;</li>
+<li>step 6: that every other field of the receipt equals the same field of <code>canonical</code>;</li>
+<li>a verdict for every input: a file that is not JSON makes it throw.</li>
+</ul>
+<p>So a receipt can pass it and still be invalid. For a full v2 check use the Python or Go library, the action or this
+site.</p>
+<p>Save as <code>verify-signature.mjs</code> and run <code>node verify-signature.mjs</code>; it prints <code>true</code>.</p>
+{code(TS_SAMPLE, "verify-signature.mjs")}""",
         ),
         (
             "action",
             "6. In CI, with the GitHub Action",
             f"""<p>{repo("verify-receipts-action")} fails the build when a receipt in the checkout does not verify under a key pinned in
-the repository. It makes no network request.</p>
-{code(ACTION_SAMPLE, "A workflow that verifies receipts")}
+the repository. It makes every step of {sec("7", "7-verification-procedure")}, and no network request.</p>
+{code(ACTION_SAMPLE, ".github/workflows/verify-receipts.yml")}
 <p>Put the receipts under <code>receipts/</code> and the key in <code>.github/receipt-keys/issuer.pem</code>. Pin a full
 commit SHA, as for any third-party action: release v0.1.0 is <code>{ACTION_V010}</code>. The strict Ed25519 profile is on
 the action's main branch, listed as unreleased in its CHANGELOG. The job summary lists the receipt as verified, with the
@@ -390,12 +374,12 @@ key <code>{TEST_ISSUER_FINGERPRINT}</code>.</p>""",
     ]
     body = f"""<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{url("/docs/")}">Docs</a></nav>
 <h1>Verify a receipt in five minutes</h1>
-<p class="lede">Check one test receipt on this site, with each library and in CI. None of the libraries is on a package
-registry yet: the commands below install from the repository, and each registry command is marked with the release it
-will work from.</p>
+<p class="lede">Check one test receipt on this site, with each library and in CI. The npm and PyPI packages are not
+published yet, and the Go module's only published version, v0.1.0, must not be used: the commands below install from the
+repository, and each registry command is marked with the release it will work from.</p>
 {sections(parts)}<p class="source">Each sample was run on 31 October 2026 on the files above, against verifiable-receipts
 <code>{SAMPLES_RUN["verifiable-receipts"][:12]}</code> and verify-receipts-action
-<code>{SAMPLES_RUN["verify-receipts-action"]}</code>.</p>"""
+<code>{SAMPLES_RUN["verify-receipts-action"][:12]}</code>.</p>"""
     return meta, body
 
 
@@ -410,7 +394,8 @@ def key_block(id_: str, title: str, pem: str, fingerprint: str, note: str) -> st
 
 ISSUER_NOTE = "It signed the conformance corpus of verifiable-receipts, and its private half was discarded. The quickstart uses it."
 LOG_NOTE = (
-    "This site's tests sign a stub log's tree heads with it. Its private half is derived from a public label, so anyone can sign with it."
+    "scripts/make-stub-log.mjs signed with it, in advance, the stub log's tree heads that this site's tests serve. "
+    "Its private half is derived from a public label, so anyone can sign with it."
 )
 FINGERPRINT_COMMAND = "grep -v -- ----- ed25519.pem | base64 -d | shasum -a 256 | cut -c1-16"
 
@@ -486,7 +471,7 @@ follows it for the keys it publishes; other issuers set their own.</p>
 <ol>
 <li><strong>Publication.</strong> Each production key is listed below with its PEM, fingerprint, status and the date it
 was first used, and is served at the issuer's URL as {sec("6.3", "63-key-publication")} says. Every change to this page
-goes through a reviewed pull request on receipts-explorer, so its history is public.</li>
+goes through a pull request that must pass CI, in receipts-explorer, so its history is public.</li>
 <li><strong>Generation.</strong> A key is made as RFC 8032 says, checked against the key rule of
 {sec("7.3", "73-ed25519-verification")} before it is published, and its private half is never put in a repository.</li>
 <li><strong>Rotation.</strong> A new key is listed here before it signs anything. The key it replaces is marked retired,

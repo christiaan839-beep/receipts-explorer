@@ -267,6 +267,12 @@ class PagesTest(unittest.TestCase):
         for route in ("/privacy/", "/terms/", "/security/"):
             self.assertEqual(current_of(PAGES[route]), [], route)
 
+    def test_no_code_block_carries_an_aria_label(self) -> None:
+        # A <pre> has no role that takes a name; a sample is named by its figcaption.
+        for route, html in PAGES.items():
+            for attrs in parse(html).all("pre"):
+                self.assertNotIn("aria-label", attrs, route)
+
     def test_every_form_field_has_a_label(self) -> None:
         p = parse(PAGES["/"])
         labelled = {a["for"] for a in p.all("label")}

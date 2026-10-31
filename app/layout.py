@@ -35,6 +35,11 @@ def esc(text: str) -> str:
     return html.escape(text, quote=True)
 
 
+def section(id_: str, title: str, body: str) -> str:
+    """A titled section of a page: an h2 that labels it, then its body (HTML)."""
+    return f'<section aria-labelledby="{id_}">\n<h2 id="{id_}">{esc(title)}</h2>\n{body}\n</section>\n'
+
+
 def _json_ld(meta: dict) -> str:
     graph = [
         {
@@ -113,6 +118,39 @@ def _footer() -> str:
     A receipt is evidence for an audit, not legal or compliance advice.</p>
   </div>
 </footer>"""
+
+
+def render_redirect(target: str, assets: dict[str, str]) -> str:
+    """A page that sends the reader to `target`, a site path, for an address the site no longer uses.
+
+    GitHub Pages cannot answer with a 301, so the page refreshes to the
+    target at once (no script, so the CSP is the same as every page's), names
+    the target as canonical so search engines move to it, is not indexed
+    itself, and links the target for a reader whose browser does not refresh.
+    """
+    href = esc(url(target))
+    return f"""<!doctype html>
+<html lang="{SITE["locale"]}">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="{CSP}">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Moved | {esc(SITE["name"])}</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="{esc(absolute(target))}">
+  <meta http-equiv="refresh" content="0; url={href}">
+  <link rel="stylesheet" href="{url("/static/styles.css")}" integrity="{assets["styles"]}">
+</head>
+<body>
+<main id="main" class="container">
+<h1>This page has moved</h1>
+<p>It is now at <a href="{href}">{esc(absolute(target))}</a>.</p>
+</main>
+</body>
+</html>
+"""
 
 
 def render_page(meta: dict, body: str, assets: dict[str, str]) -> str:
