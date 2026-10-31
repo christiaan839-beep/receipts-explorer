@@ -1,7 +1,8 @@
 """The page bodies and the ROUTES map.
 
 Every page has one h1, reads in full without JavaScript, and links each
-check to the term it relies on. Only the check page loads the script.
+check to the term it relies on. Only the check page loads the script. The
+docs are in docs.py and the policies in policies.py.
 """
 
 from __future__ import annotations
@@ -10,8 +11,10 @@ import html
 import re
 
 from .content import CHAIN, CHECKS, PRIVACY, SITE, VR_REF
-from .layout import absolute, esc, render_page, url
+from .docs import page_docs, page_keys, page_quickstart
+from .layout import absolute, esc, render_page, render_redirect, url
 from .ontology import AGENT_INTRO, BY_SLUG, NAME_NOTE, RELATIONS, TERMS, Term
+from .policies import page_privacy, page_security, page_terms_of_use
 
 
 def plain(fragment: str, limit: int = 155) -> str:
@@ -23,7 +26,7 @@ def plain(fragment: str, limit: int = 155) -> str:
 
 
 def term_link(slug: str, label: str | None = None) -> str:
-    return f'<a href="{url(f"/terms/{slug}/")}">{esc(label or BY_SLUG[slug].name)}</a>'
+    return f'<a href="{url(f"/glossary/{slug}/")}">{esc(label or BY_SLUG[slug].name)}</a>'
 
 
 def file_field(id_: str, label: str, hint: str, file_label: str, rows: int) -> str:
@@ -69,7 +72,8 @@ def page_check() -> tuple[dict, str]:
     }
     privacy = "".join(f"<li>{esc(p)}</li>" for p in PRIVACY)
     body = f"""<h1>Check a receipt</h1>
-<p class="lede">A receipt is an issuer's signed record of something an AI agent did. Paste one with the issuer's public key,
+<p class="lede">A receipt is an issuer's signed record of what it says an AI agent did: evidence for an audit, not proof
+that it happened. Paste one with the issuer's public key,
 and this page checks, in your browser, that the issuer signed exactly this text. Give a receipts-log address and the
 log's public key too, and it checks that the receipt is in the log; with witness keys, that witnesses saw the same log.</p>
 <p id="needs-js" class="notice">Checking needs JavaScript, which is off or did not load. The rest of this page explains the checks.</p>
@@ -140,8 +144,8 @@ def page_how() -> tuple[dict, str]:
         "path": "/how-it-works/",
         "title": "How it works: the chain of trust",
         "description": (
-            "How a receipt is checked without trusting the agent, its host or the log: issuer, receipt, "
-            "transparency log, tree head, inclusion proof and witnesses."
+            "How a receipt is checked without taking the agent's, its host's or the log's word for it: "
+            "issuer, receipt, log, tree head, inclusion proof, witnesses."
         ),
         "active": "how",
         "schema": {"@type": "TechArticle", "headline": "How it works: the chain of trust", "inLanguage": SITE["locale"]},
@@ -150,26 +154,27 @@ def page_how() -> tuple[dict, str]:
     note = "".join(f"<p>{p}</p>" for p in NAME_NOTE)
     body = f"""<h1>How it works</h1>
 <p class="lede">An AI agent acts for a business. The business signs a receipt for each action, and appends it to a
-transparency log that is meant only to grow; witnesses check that it does. Anyone can then check the receipt, and its
-place in the log, without trusting the agent, its host or the log.</p>
+transparency log that is meant only to grow; witnesses check that it does. Anyone with the issuer's and the log's public keys,
+from a source they trust, can then check the receipt and its place in the log without taking the agent's, its host's or
+the log's word for it.</p>
 {chain_figure()}
 <h2>What each part promises</h2>
 <ul>{relations}</ul>
 <h2>One name to read carefully</h2>
 {note}
-<p>Every term has its own page: see <a href="{url("/terms/")}">the terms</a>.</p>"""
+<p>Every term has its own page: see <a href="{url("/glossary/")}">the glossary</a>.</p>"""
     return meta, body
 
 
-def page_terms() -> tuple[dict, str]:
+def page_glossary() -> tuple[dict, str]:
     meta = {
-        "path": "/terms/",
-        "title": "Terms: the ontology of verifiable receipts",
+        "path": "/glossary/",
+        "title": "Glossary: the ontology of verifiable receipts",
         "description": "Every term verifiable receipts uses, defined once, with its SCITT (RFC 9943) equivalent where there is one.",
-        "active": "terms",
+        "active": "glossary",
         "schema": {
             "@type": "DefinedTermSet",
-            "@id": absolute("/terms/"),
+            "@id": absolute("/glossary/"),
             "name": "Verifiable receipts ontology",
             "inLanguage": SITE["locale"],
         },
@@ -180,7 +185,7 @@ def page_terms() -> tuple[dict, str]:
     agent = "".join(f"<li>{term_link(t.slug)}</li>" for t in TERMS if t.group == "agent")
     note = "".join(f"<p>{p}</p>" for p in NAME_NOTE)
     intro = "".join(f"<p>{p}</p>" for p in AGENT_INTRO)
-    body = f"""<h1>Terms</h1>
+    body = f"""<h1>Glossary</h1>
 <p class="lede">The terms of verifiable receipts, each defined once, from
 <a href="{SITE["vr_repo"]}/blob/{VR_REF}/docs/ontology.md">docs/ontology.md</a> at commit <code>{VR_REF[:12]}</code>.</p>
 {note}
@@ -194,18 +199,18 @@ def page_terms() -> tuple[dict, str]:
 
 def page_term(term: Term) -> tuple[dict, str]:
     meta = {
-        "path": f"/terms/{term.slug}/",
+        "path": f"/glossary/{term.slug}/",
         "title": f"{term.name}: definition",
         "description": plain(term.definition),
-        "active": "terms",
+        "active": "glossary",
         "schema": {
             "@type": "DefinedTerm",
             "name": term.name,
             "description": plain(term.definition, 1000),
             "inDefinedTermSet": {
                 "@type": "DefinedTermSet",
-                "@id": absolute("/terms/"),
-                "url": absolute("/terms/"),
+                "@id": absolute("/glossary/"),
+                "url": absolute("/glossary/"),
                 "name": "Verifiable receipts ontology",
             },
         },
@@ -217,7 +222,7 @@ def page_term(term: Term) -> tuple[dict, str]:
         names = " and ".join(f"“{esc(c['name'])}”" for c in checks)
         noun = "check" if len(checks) == 1 else "checks"
         used = f'<h2>Checked on this site</h2><p>This term is used by the {names} {noun}. <a href="{url("/")}">Check a receipt</a>.</p>'
-    body = f"""<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{url("/terms/")}">Terms</a></nav>
+    body = f"""<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{url("/glossary/")}">Glossary</a></nav>
 <h1>{esc(term.name)}</h1>
 <p class="definition">{term.definition}</p>
 {scitt}
@@ -236,13 +241,33 @@ def not_found() -> tuple[dict, str]:
         "schema": {"@type": "WebPage", "name": "Page not found"},
     }
     body = f"""<h1>Page not found</h1>
-<p>There is no page at this address. <a href="{url("/")}">Check a receipt</a>, or see the <a href="{url("/terms/")}">terms</a>.</p>"""
+<p>There is no page at this address. <a href="{url("/")}">Check a receipt</a>, or see the <a href="{url("/glossary/")}">glossary</a>.</p>"""
     return meta, body
 
 
-ROUTES = {"/": page_check, "/how-it-works/": page_how, "/terms/": page_terms}
+ROUTES = {
+    "/": page_check,
+    "/how-it-works/": page_how,
+    "/docs/": page_docs,
+    "/docs/quickstart/": page_quickstart,
+    "/keys/": page_keys,
+    "/glossary/": page_glossary,
+    "/privacy/": page_privacy,
+    "/terms/": page_terms_of_use,
+    "/security/": page_security,
+}
 for _t in TERMS:
-    ROUTES[f"/terms/{_t.slug}/"] = lambda t=_t: page_term(t)
+    ROUTES[f"/glossary/{_t.slug}/"] = lambda t=_t: page_term(t)
+
+
+# The glossary was at /terms/ until /terms/ became the terms of use: each
+# old term address sends its reader to the term's glossary page.
+REDIRECTS = {f"/terms/{t.slug}/": f"/glossary/{t.slug}/" for t in TERMS}
+
+
+def render_moved(path: str, assets: dict[str, str]) -> str | None:
+    target = REDIRECTS.get(path)
+    return None if target is None else render_redirect(target, assets)
 
 
 def render_route(path: str, assets: dict[str, str]) -> str | None:

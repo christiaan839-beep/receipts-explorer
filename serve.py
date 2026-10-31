@@ -11,7 +11,8 @@ build/check.js (run npm run bundle first) on every request.
 The server listens on 127.0.0.1 only, and answers only requests addressed
 to 127.0.0.1:<port> or localhost:<port>, so a web page cannot reach it
 through a name of its own (DNS rebinding). It serves nothing outside
-static/ and build/check.js (live) or dist/ (--dist), and no hidden file.
+static/ and build/check.js (live) or dist/ (--dist), and no hidden file
+but one: .well-known/security.txt, as GitHub Pages serves it.
 """
 
 from __future__ import annotations
@@ -28,8 +29,9 @@ sys.path.insert(0, str(ROOT))
 
 from app.assets import SCRIPT, hashes  # noqa: E402
 from app.content import SITE  # noqa: E402
-from app.pages import all_routes, render_not_found, render_route  # noqa: E402
-from build import DIST, robots, sitemap  # noqa: E402
+from app.pages import REDIRECTS, all_routes, render_moved, render_not_found, render_route  # noqa: E402
+from app.policies import security_txt  # noqa: E402
+from build import DIST, SECURITY_TXT, robots, sitemap  # noqa: E402
 
 BASE = SITE["base_path"]
 STATIC = ROOT / "static"
@@ -123,13 +125,20 @@ class Handler(BaseHTTPRequestHandler):
             root = self.dist_dir.resolve()
             dirs = [p.parent.relative_to(root).as_posix() for p in root.rglob("index.html") if p.parent != root]
         else:
-            dirs = [r.strip("/") for r in all_routes() if r != "/"]
+            dirs = [r.strip("/") for r in [*all_routes(), *REDIRECTS] if r != "/"]
         return {f"{BASE}/{d}": quote(f"{BASE}/{d}/") for d in dirs if not any(part.startswith(".") for part in d.split("/"))}
 
     def _find(self, rel: str) -> tuple[bytes | str, str] | None:
         """The body and type of the file or page at `rel` (under the base path), or None."""
         if rel == "" or rel.endswith("/"):
             rel += "index.html"
+        if rel == SECURITY_TXT:
+            # The one hidden path the site publishes. inside() refuses every
+            # other, so it is looked up here by its exact name.
+            if not self.dist:
+                return security_txt(), TYPES[".txt"]
+            path = self.dist_dir / SECURITY_TXT
+            return (path.read_bytes(), TYPES[".txt"]) if path.is_file() and not path.is_symlink() else None
         if self.dist:
             return self._file(self.dist_dir, rel)
         if rel == "robots.txt":
@@ -141,7 +150,8 @@ class Handler(BaseHTTPRequestHandler):
         if rel.startswith("static/"):
             return self._file(self.static_dir, rel[len("static/") :])
         if rel == "index.html" or rel.endswith("/index.html"):
-            html = render_route("/" + rel[: -len("index.html")], hashes())
+            route = "/" + rel[: -len("index.html")]
+            html = render_route(route, hashes()) or render_moved(route, hashes())
             return None if html is None else (html, TYPES[".html"])
         return None
 

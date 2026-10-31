@@ -4,7 +4,11 @@
 Usage:  npm run bundle && python3 build.py [--out DIR]
 
 dist/ holds every page, 404.html, static/ (styles, images and check.js),
-robots.txt and sitemap.xml. The output depends only on the
+a page for each old /terms/<term>/ address that sends its reader to
+/glossary/<term>/, robots.txt, sitemap.xml and .well-known/security.txt
+(RFC 9116), which
+deploy.yml uploads with include-hidden-files: upload-pages-artifact leaves
+out files whose names start with a dot unless told otherwise. The output depends only on the
 sources: no dates, no randomness, so a rebuild is byte-identical.
 
 The site is written to a new directory beside the output and swapped in
@@ -25,10 +29,12 @@ sys.path.insert(0, str(ROOT))
 
 from app.assets import SCRIPT, hashes  # noqa: E402
 from app.content import SITE  # noqa: E402
-from app.pages import all_routes, render_not_found, render_route  # noqa: E402
+from app.pages import REDIRECTS, all_routes, render_moved, render_not_found, render_route  # noqa: E402
+from app.policies import security_txt  # noqa: E402
 
 DIST = ROOT / "dist"
 STATIC = ROOT / "static"
+SECURITY_TXT = ".well-known/security.txt"
 
 
 def write(out: Path, rel: str, content: str) -> None:
@@ -53,11 +59,14 @@ def render_into(out: Path) -> None:
         if html is None:
             raise RuntimeError(f"route {route} did not render")
         write(out, "index.html" if route == "/" else route.strip("/") + "/index.html", html)
+    for old in REDIRECTS:
+        write(out, old.strip("/") + "/index.html", render_moved(old, assets) or "")
     write(out, "404.html", render_not_found(assets))
     shutil.copytree(STATIC, out / "static", ignore=shutil.ignore_patterns(".*"))
     shutil.copyfile(SCRIPT, out / "static" / "check.js")
     write(out, "robots.txt", robots())
     write(out, "sitemap.xml", sitemap())
+    write(out, SECURITY_TXT, security_txt())
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -80,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
             old.rename(out)
         raise
     shutil.rmtree(old, ignore_errors=True)
-    print(f"Built {len(all_routes())} pages, 404.html, sitemap.xml and robots.txt in {out}")
+    print(f"Built {len(all_routes())} pages, 404.html, sitemap.xml, robots.txt and {SECURITY_TXT} in {out}")
 
 
 if __name__ == "__main__":

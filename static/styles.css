@@ -37,6 +37,8 @@
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); overflow-wrap: anywhere; }
 .hash { word-break: break-all; }
+/* A key fingerprint and its punctuation move to the next line whole; see withHashes in src/ui.ts. */
+.nowrap { white-space: nowrap; }
 a { color: var(--link); text-underline-offset: 0.15em; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .container { max-width: 48rem; margin: 0 auto; padding: 0 var(--space); }
@@ -104,6 +106,21 @@ summary { cursor: pointer; font-weight: 600; }
 .source { color: var(--muted); font-size: 0.95rem; margin-top: 2rem; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
 .site-footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.95rem; padding: 1rem 0 2rem; }
+.footer-nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; list-style: none; margin: 0 0 0.75rem; padding: 0; }
+/* The docs and policies. Code wraps rather than scrolls, so no block needs
+   a scroll bar, or a tab stop to reach one, at 320 px. */
+.code { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem; font-size: 0.85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.code code { font-size: inherit; }
+.sample { margin: 1rem 0; }
+.sample figcaption { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.25rem; }
+.sample .code { margin: 0; }
+.toc { border-left: 3px solid var(--line); padding-left: var(--space); margin: 1rem 0 1.5rem; }
+.toc ul { margin: 0; padding-left: 1rem; }
+.unpublished, .policy, .key { border: 1px solid var(--line); border-left: 6px solid var(--net); border-radius: 6px; padding: 0.5rem var(--space); }
+.policy, .key { margin: 1rem 0; }
+.key--production { border-left-color: var(--muted); }
+.key h3 { margin-top: 0.25rem; }
+.key-label, .policy-label { color: var(--net); margin: 0.25rem 0; }
 [hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

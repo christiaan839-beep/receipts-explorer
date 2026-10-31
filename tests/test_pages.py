@@ -7,6 +7,7 @@ import unittest
 from html.parser import HTMLParser
 from unittest import mock
 
+from app.content import FOOTER
 from app.layout import CSP, render_page
 from app.ontology import Term
 from app.pages import all_routes, page_term, render_not_found, render_route
@@ -14,6 +15,8 @@ from app.pages import all_routes, page_term, render_not_found, render_route
 ASSETS = {"styles": "sha384-styles", "script": "sha384-script"}
 BASE = ""
 STATIC = {f"{BASE}/static/styles.css", f"{BASE}/static/check.js", f"{BASE}/static/img/favicon.svg"}
+# Files the site publishes beside its pages, which the footer links.
+FILES = {f"{BASE}/sitemap.xml", f"{BASE}/robots.txt", f"{BASE}/.well-known/security.txt"}
 
 
 class Page(HTMLParser):
@@ -42,6 +45,10 @@ class Page(HTMLParser):
         return next(a["content"] for a in self.all("meta") if a.get(key) == value)
 
 
+def current_of(html: str) -> list[tuple[str, str]]:
+    return [(a["href"], a["aria-current"]) for a in parse(html).all("a") if "aria-current" in a]
+
+
 def parse(html: str) -> Page:
     p = Page()
     p.feed(html)
@@ -61,7 +68,7 @@ EVIL = Term(
     group="protocol",
 )
 EVIL_PAGE = render_page(*page_term(EVIL), ASSETS)
-PAGES["/terms/evil/"] = EVIL_PAGE
+PAGES["/glossary/evil/"] = EVIL_PAGE
 
 NOINDEX = {"/404.html"}
 
@@ -176,9 +183,9 @@ class PagesTest(unittest.TestCase):
         self.assertEqual(data["@graph"][1]["description"], 'A <script>"& definition.')
 
     def test_the_nav_labels_and_site_name_are_text(self) -> None:
-        nav = [{"label": "<b>&amp;", "path": "/terms/", "key": "terms"}]
+        nav = [{"label": "<b>&amp;", "path": "/glossary/", "key": "glossary"}]
         with mock.patch("app.layout.NAV", nav), mock.patch.dict("app.layout.SITE", {"name": "<i>&amp;"}):
-            p = parse(render_route("/terms/", ASSETS) or "")
+            p = parse(render_route("/glossary/", ASSETS) or "")
         self.assertEqual([t for t, _ in p.tags if t in ("b", "i")], [])
         links = [a for a in p.all("a") if a.get("class") == "brand" or "aria-current" in a]
         self.assertEqual(len(links), 2)
@@ -195,11 +202,11 @@ class PagesTest(unittest.TestCase):
             return [(a["href"], a["aria-current"]) for a in parse(PAGES[route]).all("a") if "aria-current" in a]
 
         self.assertEqual(current("/"), [(f"{BASE}/", "page")])
-        self.assertEqual(current("/terms/"), [(f"{BASE}/terms/", "page")])
-        self.assertEqual(current("/terms/receipt/"), [(f"{BASE}/terms/", "true")])
+        self.assertEqual(current("/glossary/"), [(f"{BASE}/glossary/", "page")])
+        self.assertEqual(current("/glossary/receipt/"), [(f"{BASE}/glossary/", "true")])
         self.assertEqual(current("/404.html"), [])
-        navs = [a.get("aria-label") for a in parse(PAGES["/terms/receipt/"]).all("nav")]
-        self.assertEqual(navs, ["Main", "Breadcrumb"])
+        navs = [a.get("aria-label") for a in parse(PAGES["/glossary/receipt/"]).all("nav")]
+        self.assertEqual(navs, ["Main", "Breadcrumb", "Footer"])
 
     def test_the_check_page_says_it_needs_javascript_until_the_script_starts(self) -> None:
         p = parse(PAGES["/"])
@@ -226,7 +233,7 @@ class PagesTest(unittest.TestCase):
                 self.assertEqual(scripts, [], route)
 
     def test_every_internal_link_resolves(self) -> None:
-        targets = {BASE + r for r in all_routes()} | STATIC
+        targets = {BASE + r for r in all_routes()} | STATIC | FILES
         for route, html in PAGES.items():
             p = parse(html)
             ids = {a["id"] for _, a in p.tags if "id" in a}
@@ -236,6 +243,35 @@ class PagesTest(unittest.TestCase):
                     self.assertIn(href[1:], ids, f"{route}: {href}")
                 elif href.startswith("/"):
                     self.assertIn(href.split("#")[0], targets, f"{route}: {href}")
+
+    def test_every_page_has_the_footer_links(self) -> None:
+        want = [f"{BASE}{f['path']}" for f in FOOTER]
+        self.assertIn(f"{BASE}/privacy/", want)
+        self.assertIn(f"{BASE}/sitemap.xml", want)
+        for route, html in PAGES.items():
+            with self.subTest(route=route):
+                footer = html[html.index('<footer class="site-footer">') :]
+                self.assertEqual([a["href"] for a in parse(footer).all("a")][: len(want)], want)
+                self.assertIn('aria-label="Footer"', footer)
+
+    def test_the_nav_links_the_docs_and_keys(self) -> None:
+        nav = parse(PAGES["/"].split("</nav>")[0]).all("a")
+        self.assertEqual(
+            [a["href"] for a in nav][2:],  # after the skip link and the brand
+            [f"{BASE}/", f"{BASE}/how-it-works/", f"{BASE}/docs/", f"{BASE}/keys/", f"{BASE}/glossary/"],
+        )
+        self.assertEqual(current_of(PAGES["/docs/quickstart/"]), [(f"{BASE}/docs/", "true")])
+        self.assertEqual(current_of(PAGES["/keys/"]), [(f"{BASE}/keys/", "page")])
+
+    def test_the_policies_are_in_no_section_of_the_nav(self) -> None:
+        for route in ("/privacy/", "/terms/", "/security/"):
+            self.assertEqual(current_of(PAGES[route]), [], route)
+
+    def test_no_code_block_carries_an_aria_label(self) -> None:
+        # A <pre> has no role that takes a name; a sample is named by its figcaption.
+        for route, html in PAGES.items():
+            for attrs in parse(html).all("pre"):
+                self.assertNotIn("aria-label", attrs, route)
 
     def test_every_form_field_has_a_label(self) -> None:
         p = parse(PAGES["/"])

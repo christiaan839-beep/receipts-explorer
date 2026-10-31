@@ -1,0 +1,16 @@
+permissions:
+  contents: read
+
+jobs:
+  receipts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify receipts
+        uses: christiaan839-beep/verify-receipts-action@FULL_COMMIT_SHA # the release you reviewed
+        with:
+          receipts: |
+            receipts/**/*.json
+          public-keys-file: .github/receipt-keys/issuer.pem

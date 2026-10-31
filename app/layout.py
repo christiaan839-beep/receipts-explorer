@@ -14,7 +14,7 @@ from __future__ import annotations
 import html
 import json
 
-from .content import NAV, SITE
+from .content import FOOTER, NAV, SITE
 
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https:; base-uri 'none'; "
@@ -23,7 +23,7 @@ CSP = (
 
 
 def url(path: str) -> str:
-    """A site path under the base path (the root, on verify.sovereignmatrix.co.za), such as /terms/."""
+    """A site path under the base path (the root, on verify.sovereignmatrix.co.za), such as /glossary/."""
     return SITE["base_path"] + path
 
 
@@ -33,6 +33,11 @@ def absolute(path: str) -> str:
 
 def esc(text: str) -> str:
     return html.escape(text, quote=True)
+
+
+def section(id_: str, title: str, body: str) -> str:
+    """A titled section of a page: an h2 that labels it, then its body (HTML)."""
+    return f'<section aria-labelledby="{id_}">\n<h2 id="{id_}">{esc(title)}</h2>\n{body}\n</section>\n'
 
 
 def _json_ld(meta: dict) -> str:
@@ -103,13 +108,49 @@ def _header(meta: dict) -> str:
 
 
 def _footer() -> str:
+    links = "".join(f'<li><a href="{url(f["path"])}">{esc(f["label"])}</a></li>' for f in FOOTER)
     return f"""<footer class="site-footer">
   <div class="container">
+    <nav aria-label="Footer"><ul class="footer-nav">{links}</ul></nav>
     <p>Open source, Apache-2.0: <a href="{esc(SITE["repo"])}">receipts-explorer on GitHub</a>.
     The checks are those of <a href="{esc(SITE["vr_repo"])}">verifiable-receipts</a>.</p>
-    <p>{esc(SITE["author"])}.</p>
+    <p>Run by {esc(SITE["operator"])}: <a href="mailto:{esc(SITE["email"])}">{esc(SITE["email"])}</a>.
+    A receipt is evidence for an audit, not legal or compliance advice.</p>
   </div>
 </footer>"""
+
+
+def render_redirect(target: str, assets: dict[str, str]) -> str:
+    """A page that sends the reader to `target`, a site path, for an address the site no longer uses.
+
+    GitHub Pages cannot answer with a 301, so the page refreshes to the
+    target at once (no script, so the CSP is the same as every page's), names
+    the target as canonical so search engines move to it, is not indexed
+    itself, and links the target for a reader whose browser does not refresh.
+    """
+    href = esc(url(target))
+    return f"""<!doctype html>
+<html lang="{SITE["locale"]}">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="{CSP}">
+  <meta name="referrer" content="no-referrer">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Moved | {esc(SITE["name"])}</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="{esc(absolute(target))}">
+  <meta http-equiv="refresh" content="0; url={href}">
+  <link rel="stylesheet" href="{url("/static/styles.css")}" integrity="{assets["styles"]}">
+</head>
+<body>
+<main id="main" class="container">
+<h1>This page has moved</h1>
+<p>It is now at <a href="{href}">{esc(absolute(target))}</a>.</p>
+</main>
+</body>
+</html>
+"""
 
 
 def render_page(meta: dict, body: str, assets: dict[str, str]) -> str:

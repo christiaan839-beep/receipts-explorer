@@ -45,7 +45,7 @@
     "id": "witnesses",
     "name": "Witnesses",
     "term": "cosignature",
-    "proves": "Independent witnesses saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size.",
+    "proves": "The witnesses whose keys you gave saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size.",
     "doesNotProve": "That the witnesses are independent of the log; that depends on who runs them."
   }
 ]

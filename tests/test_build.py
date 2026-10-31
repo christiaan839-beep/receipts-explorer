@@ -18,7 +18,10 @@ from unittest import mock
 
 import build
 from app.content import SITE
+from app.layout import CSP
+from app.ontology import TERMS
 from app.pages import all_routes
+from app.policies import security_txt
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,13 +52,24 @@ class BuildTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_it_says_what_it_built(self) -> None:
-        self.assertIn(f"Built {len(all_routes())} pages, 404.html, sitemap.xml and robots.txt in {self.dist.resolve()}", self.stdout)
+        self.assertIn(
+            f"Built {len(all_routes())} pages, 404.html, sitemap.xml, robots.txt and .well-known/security.txt in {self.dist.resolve()}",
+            self.stdout,
+        )
 
     def test_every_route_and_file_is_written(self) -> None:
         for route in all_routes():
             rel = "index.html" if route == "/" else route.strip("/") + "/index.html"
             self.assertIn(rel, self.first)
-        for rel in ("404.html", "robots.txt", "sitemap.xml", "static/check.js", "static/styles.css", "static/img/favicon.svg"):
+        for rel in (
+            "404.html",
+            "robots.txt",
+            "sitemap.xml",
+            ".well-known/security.txt",
+            "static/check.js",
+            "static/styles.css",
+            "static/img/favicon.svg",
+        ):
             self.assertIn(rel, self.first)
 
     def test_the_script_is_the_bundle(self) -> None:
@@ -64,7 +78,7 @@ class BuildTest(unittest.TestCase):
     def test_every_integrity_attribute_is_the_hash_of_the_file_it_names(self) -> None:
         base = SITE["base_path"] + "/"
         pages = sorted(self.dist.rglob("*.html"))
-        self.assertEqual(len(pages), len(all_routes()) + 1)
+        self.assertEqual(len(pages), len(all_routes()) + 1 + len(TERMS))
         seen = set()
         for page in pages:
             html = page.read_text(encoding="utf-8")
@@ -95,6 +109,27 @@ class BuildTest(unittest.TestCase):
         run_build(self.dist)
         self.assertEqual(snapshot(self.dist), self.first)
         self.assertEqual([p.name for p in self.dist.parent.iterdir()], ["dist"])
+
+    def test_security_txt_is_the_one_hidden_file(self) -> None:
+        hidden = [rel for rel in self.first if any(part.startswith(".") for part in rel.split("/"))]
+        self.assertEqual(hidden, [".well-known/security.txt"])
+        self.assertEqual((self.dist / ".well-known" / "security.txt").read_text(encoding="utf-8"), security_txt())
+
+    def test_each_old_term_address_redirects_to_its_glossary_page(self) -> None:
+        for term in TERMS:
+            with self.subTest(term=term.slug):
+                page = (self.dist / "terms" / term.slug / "index.html").read_text(encoding="utf-8")
+                target = f"https://verify.sovereignmatrix.co.za/glossary/{term.slug}/"
+                self.assertIn(f'<meta http-equiv="refresh" content="0; url=/glossary/{term.slug}/">', page)
+                self.assertIn(f'<link rel="canonical" href="{target}">', page)
+                self.assertIn('<meta name="robots" content="noindex">', page)
+                self.assertIn(f'<a href="/glossary/{term.slug}/">', page)
+                self.assertIn(f'content="{CSP}"', page)
+                self.assertNotIn("<script", page)
+                self.assertNotIn("style=", page)
+        # /terms/ itself stays the terms of use, and no redirect is in the sitemap.
+        self.assertIn("<h1>Terms of use</h1>", (self.dist / "terms" / "index.html").read_text(encoding="utf-8"))
+        self.assertNotIn("/terms/receipt/", (self.dist / "sitemap.xml").read_text(encoding="utf-8"))
 
     def test_the_site_is_readable_by_all(self) -> None:
         self.assertEqual(stat.S_IMODE(self.dist.stat().st_mode), 0o755)
@@ -132,7 +167,8 @@ class BuildInProcessTest(unittest.TestCase):
             build.main(["--out", str(self.dist)])
         names = {str(p.relative_to(self.dist)) for p in self.dist.rglob("*")}
         self.assertIn("static/styles.css", names)
-        self.assertFalse([n for n in names if Path(n).name.startswith(".")], names)
+        # .well-known/security.txt is the site's own, written by build.py, not from static/.
+        self.assertFalse([n for n in names if n.startswith("static/") and Path(n).name.startswith(".")], names)
 
     def test_the_default_output_is_dist(self) -> None:
         self.assertEqual(build.DIST, ROOT / "dist")

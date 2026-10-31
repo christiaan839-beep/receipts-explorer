@@ -54,7 +54,7 @@ quoted from `content/checks.json`, the same sentences the site shows.
    root, signed by a witness key you gave. A fork cosignature whose text is
    not canonical, or whose signature does not verify under a key you gave,
    is skipped. A log that withholds a fork cosignature is not caught here.
-   - Proves: "Independent witnesses saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size."
+   - Proves: "The witnesses whose keys you gave saw this log at this size with this same root, so the log would have to fool them too to show you a different one, and none of the cosignatures the log returned shows a witness you gave cosigning another root for this size."
    - Does not prove: "That the witnesses are independent of the log; that depends on who runs them."
 
 Each is passed, failed or not run. A check that cannot run is never shown
@@ -65,6 +65,22 @@ from the log, because a key fetched from the log proves nothing. Without
 witness keys, Witnesses is not run. Per run, the log is asked for at most one tree head, one list of
 cosignatures (only when you give witness keys) and one inclusion proof per
 receipt, and for nothing after a tree head that fails.
+
+## The other pages
+
+- **Docs** (`/docs/`): what a VAOS 2.0 receipt is, the strict Ed25519
+  profile, what the transparency log and witnesses add, and what a receipt
+  proves and does not prove, each claim citing its spec section.
+- **Quickstart** (`/docs/quickstart/`): one test receipt, checked here, with
+  the Python, Go and TypeScript libraries, and with verify-receipts-action.
+- **Keys** (`/keys/`): how issuer keys are published and fingerprinted, and
+  the operator's rotation and revocation policy. No production key is
+  published yet.
+- **Glossary** (`/glossary/`): the terms of `docs/ontology.md`.
+- **Privacy**, **Terms of use** and **Security** (`/privacy/`, `/terms/`,
+  `/security/`), and `/.well-known/security.txt` (RFC 9116). Its `Expires`
+  date is `SECURITY_TXT_EXPIRES` in `app/content.py`; the tests fail 30 days
+  before it, as a reminder to renew it.
 
 ## How it is built
 
@@ -80,7 +96,9 @@ receipt, and for nothing after a tree head that fails.
 - **Hosting**: GitHub Pages, at the root of its own domain,
   `verify.sovereignmatrix.co.za`, deployed from `main` by `.github/workflows/deploy.yml`,
   which runs CI, builds `dist/`, checks the size budget and attests the
-  build provenance of every file before it deploys. A Content Security
+  build provenance of every file before it deploys. It uploads `dist/`
+  with `include-hidden-files`, which `.well-known/` needs: upload-pages-artifact
+  leaves out names that start with a dot unless told otherwise. A Content Security
   Policy allows scripts and styles from the site only, no inline code, and
   connections over https only; in a browser that enforces Trusted Types it
   also refuses HTML built from strings. The stylesheet and the script carry

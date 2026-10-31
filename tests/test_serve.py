@@ -15,6 +15,7 @@ from unittest import mock
 
 import serve
 from app.pages import all_routes
+from app.policies import security_txt
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -121,9 +122,9 @@ class ServeTests(unittest.TestCase):
 
     def test_the_site_redirects_only_within_itself(self) -> None:
         for path, location in (
-            ("/terms", "/terms/"),
+            ("/glossary", "/glossary/"),
             ("/how-it-works", "/how-it-works/"),
-            ("/terms/receipt", "/terms/receipt/"),
+            ("/glossary/receipt", "/glossary/receipt/"),
         ):
             status, headers, _ = self.server.get(path)
             self.assertEqual((status, headers.get("Location")), (301, location), path)
@@ -144,7 +145,7 @@ class ServeTests(unittest.TestCase):
     def test_a_missing_path_is_not_found_rather_than_redirected(self) -> None:
         for path in (
             "/nope",
-            "/terms/nope",
+            "/glossary/nope",
             "/nope/",
             "/elsewhere/",
             "/nope.zz",
@@ -168,7 +169,7 @@ class ServeTests(unittest.TestCase):
             f"localhost.attacker.example:{port}",
             "",
         ):
-            for path in ("/", "/static/styles.css", "/static/%2e%2e/.env", "/terms/"):
+            for path in ("/", "/static/styles.css", "/static/%2e%2e/.env", "/glossary/"):
                 status, headers, body = self.server.get(path, host=host)
                 self.assertEqual(status, 421, (host, path))
                 self.assertIsNone(headers.get("Location"))
@@ -178,8 +179,8 @@ class ServeTests(unittest.TestCase):
         for path, ctype in (
             ("/", "text/html; charset=utf-8"),
             ("/index.html", "text/html; charset=utf-8"),
-            ("/terms/", "text/html; charset=utf-8"),
-            ("/terms/index.html", "text/html; charset=utf-8"),
+            ("/glossary/", "text/html; charset=utf-8"),
+            ("/glossary/index.html", "text/html; charset=utf-8"),
             ("/static/styles.css", "text/css; charset=utf-8"),
             ("/static/check.js", "text/javascript; charset=utf-8"),
             ("/static/img/favicon.svg", "image/svg+xml"),
@@ -190,9 +191,27 @@ class ServeTests(unittest.TestCase):
             self.assertEqual((status, headers["Content-Type"]), (200, ctype), path)
             self.assertEqual(headers["X-Content-Type-Options"], "nosniff", path)
             self.assertEqual(int(headers["Content-Length"]), len(body), path)
-        for path, host in (("/nope/", None), ("/terms", None), ("/", "attacker.example")):
+        for path, host in (("/nope/", None), ("/glossary", None), ("/", "attacker.example")):
             _, headers, _ = self.server.get(path, host=host)
             self.assertEqual(headers["X-Content-Type-Options"], "nosniff", path)
+
+    def test_security_txt_is_the_one_hidden_file_served(self) -> None:
+        status, headers, body = self.server.get("/.well-known/security.txt")
+        self.assertEqual((status, headers["Content-Type"]), (200, "text/plain; charset=utf-8"))
+        self.assertEqual(body.decode("utf-8"), security_txt())
+        for path in ("/.well-known/", "/.well-known", "/.well-known/other.txt", "/.well-known/security.txt/", "/.well-known/../.env"):
+            status, headers, _ = self.server.get(path)
+            self.assertEqual(status, 404, path)
+            self.assertIsNone(headers.get("Location"), path)
+
+    def test_an_old_term_address_is_a_page_that_sends_you_to_the_glossary(self) -> None:
+        status, headers, body = self.server.get("/terms/receipt/")
+        self.assertEqual((status, headers["Content-Type"]), (200, "text/html; charset=utf-8"))
+        self.assertIn(b'<meta http-equiv="refresh" content="0; url=/glossary/receipt/">', body)
+        status, headers, _ = self.server.get("/terms/receipt")
+        self.assertEqual((status, headers.get("Location")), (301, "/terms/receipt/"))
+        status, _, body = self.server.get("/terms/")
+        self.assertIn(b"<h1>Terms of use</h1>", body)
 
     def test_the_script_is_the_bundle(self) -> None:
         _, _, body = self.server.get("/static/check.js")
@@ -279,7 +298,7 @@ class DistServeTest(ServeTests):
         cls.tmp.cleanup()
 
     def test_files_come_from_the_built_site(self) -> None:
-        for rel in ("index.html", "terms/index.html", "404.html", "static/styles.css", "robots.txt"):
+        for rel in ("index.html", "glossary/index.html", "404.html", "static/styles.css", "robots.txt"):
             status, _, body = self.server.get("/" + rel)
             self.assertEqual((status, body), (200, (self.out / rel).read_bytes()), rel)
 
